@@ -5,7 +5,7 @@ class AuthCheckRequested extends AuthEvent {}
 class AuthSignInRequested extends AuthEvent {
   final String email;
   final String password;
-  AuthSignInRequested(this.email, this.password);
+  AuthSignInRequested({required this.email, required this.password});
 }
 
 class AuthSignOutRequested extends AuthEvent {}
