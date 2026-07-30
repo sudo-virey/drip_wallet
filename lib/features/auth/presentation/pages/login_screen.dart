@@ -137,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const Text('Don\'t have a family account? '),
                     GestureDetector(
-                      onTap: () {},
+                      onTap: () => Navigator.of(context).pushNamed('/signup'),
                       child: const Text(
                         'Sign Up',
                         style: TextStyle(fontWeight: FontWeight.bold),

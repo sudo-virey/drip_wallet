@@ -9,6 +9,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc(this.repository) : super(AuthInitial()) {
     on<AuthCheckRequested>(_onCheckRequested);
     on<AuthSignInRequested>(_onSignInRequested);
+    on<AuthSignUpRequested>(_onSignUpRequested);
     on<AuthSignOutRequested>(_onSignOutRequested);
   }
 
@@ -24,6 +25,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onSignInRequested(AuthSignInRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     final result = await repository.signIn(event.email, event.password);
+    
+    result.fold(
+      (failure) => emit(AuthError(failure.message)),
+      (user) => emit(Authenticated(user)),
+    );
+  }
+
+  Future<void> _onSignUpRequested(AuthSignUpRequested event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+    final result = await repository.signUp(event.name, event.email, event.password);
     
     result.fold(
       (failure) => emit(AuthError(failure.message)),

@@ -4,6 +4,7 @@ import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
 import 'package:drip_wallet/ui/layout/main_layout.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drip_wallet/features/auth/presentation/pages/login_screen.dart';
+import 'package:drip_wallet/features/auth/presentation/pages/sign_up_screen.dart';
 import 'package:drip_wallet/features/home/presentation/pages/home_screen.dart';
 import 'package:drip_wallet/features/history/presentation/pages/history_screen.dart';
 import 'package:drip_wallet/features/profile/presentation/pages/profile_screen.dart';
@@ -18,13 +19,14 @@ GoRouter createRouter(AuthBloc authBloc) {
     redirect: (context, state) {
       final authState = authBloc.state;
       final isGoingToLogin = state.matchedLocation == '/login';
+      final isGoingToSignUp = state.matchedLocation == '/signup';
       if (authState is AuthInitial || authState is AuthLoading) {
         return null; // O podrías retornar '/splash' si tuvieras una ruta así
       }
-      if (authState is Unauthenticated && !isGoingToLogin) {
+      if (authState is Unauthenticated && !isGoingToLogin && !isGoingToSignUp) {
         return '/login';
       }
-      if (authState is Authenticated && isGoingToLogin) {
+      if (authState is Authenticated && (isGoingToLogin || isGoingToSignUp)) {
         return '/home';
       }
       return null;
@@ -38,7 +40,8 @@ GoRouter createRouter(AuthBloc authBloc) {
           StatefulShellBranch(routes: [GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen())]),
         ],
       ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()), 
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/signup', builder: (context, state) => const SignUpScreen()),
     ],
   );
 }
