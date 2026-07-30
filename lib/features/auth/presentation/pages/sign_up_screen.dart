@@ -5,6 +5,7 @@ import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_event.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
+import 'package:go_router/go_router.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -35,10 +36,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+          context.go('/home');
         } else if (state is AuthError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Sign up failed: ${state.message}')),
+          // Mostrar diálogo de error más prominente
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Registration Failed'),
+              content: Text(state.message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
           );
         }
       },
@@ -131,7 +143,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       children: [
                         const Text('Already have an account? '),
                         GestureDetector(
-                          onTap: () => Navigator.of(context).pushNamed('/login'),
+                          onTap: () => context.push('/login'),
                           child: const Text(
                             'Sign In',
                             style: TextStyle(
@@ -212,18 +224,49 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _handleSignUp() {
     // 1. Validar el formulario usando el controlador de drip_ui
     if (!_controller.validateAll()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, revisa tus datos')),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Validation Error'),
+          content: const Text('Please check all fields and try again.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
       );
       return;
     }
 
     // 2. Obtener valores de los campos
-    final name = _controller.getTextController('name').text;
-    final email = _controller.getTextController('email').text;
-    final password = _controller.getTextController('password').text;
+    final name = _controller.getTextController('name').text.trim();
+    final email = _controller.getTextController('email').text.trim();
+    final password = _controller.getTextController('password').text.trim();
 
-    // 3. Disparar el evento al BLoC
+    // 3. Validaciones adicionales del lado del cliente
+    if (name.isEmpty) {
+      _showErrorDialog('Full name is required');
+      return;
+    }
+
+    if (email.isEmpty) {
+      _showErrorDialog('Email is required');
+      return;
+    }
+
+    if (!email.contains('@')) {
+      _showErrorDialog('Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 6) {
+      _showErrorDialog('Password must be at least 6 characters long');
+      return;
+    }
+
+    // 4. Disparar el evento al BLoC
     context.read<AuthBloc>().add(
           AuthSignUpRequested(
             name: name,
@@ -231,6 +274,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
             password: password,
           ),
         );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Registration Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleGoogleSignUp() async {

@@ -5,6 +5,9 @@ import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_event.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
+import 'package:drip_wallet/features/profile/data/repositories/profile_repository.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,15 +17,44 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  late final ProfileRepository _profileRepo;
+  Map<String, dynamic>? _profileData;
+  bool _isLoading = true;
   bool _notificationsEnabled = true;
   bool _lightModeEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileRepo = ProfileRepository(
+      client: Supabase.instance.client,
+    );
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      try {
+        final data = await _profileRepo.getProfile(authState.user.id);
+        if (mounted) {
+          setState(() {
+            _profileData = data;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Unauthenticated) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+          context.go('/login');
         } else if (state is AuthError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Logout failed: ${state.message}')),
@@ -31,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
-          if (state is AuthLoading) {
+          if (state is AuthLoading || _isLoading) {
             return Scaffold(
               backgroundColor: context.dripBackground,
               body: const Center(child: CircularProgressIndicator()),
@@ -74,6 +106,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader() {
+    final name = _profileData?['name'] ?? 'Usuario';
+    final email = _profileData?['email'] ?? '';
+
     return Column(
       children: [
         Stack(
@@ -118,11 +153,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        const Text(
-          'Alex Johnson',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        Text(
+          name,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
+        if (email.isNotEmpty)
+          Text(
+            email,
+            style: TextStyle(color: context.dripHint),
+          ),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(

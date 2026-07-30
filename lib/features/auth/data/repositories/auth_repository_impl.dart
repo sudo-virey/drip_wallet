@@ -10,17 +10,19 @@ class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl(this.supabaseClient);
 
   @override
-  Future<Either<Failure, UserEntity>> signIn(String email, String password) async {
+  Future<Either<Failure, UserEntity>> signIn(
+    String email,
+    String password,
+  ) async {
     try {
       final response = await supabaseClient.auth.signInWithPassword(
-        email: email, 
+        email: email,
         password: password,
       );
-      
-      return Right(UserEntity(
-        id: response.user!.id, 
-        email: response.user!.email!
-      ));
+
+      return Right(
+        UserEntity(id: response.user!.id, email: response.user!.email!),
+      );
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -29,21 +31,33 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, UserEntity>> signUp(String name, String email, String password) async {
+  Future<Either<Failure, UserEntity>> signUp(
+    String name,
+    String email,
+    String password,
+  ) async {
     try {
       final response = await supabaseClient.auth.signUp(
         email: email,
         password: password,
+        data: {'name': name}, // Pasamos el nombre en el 'user_metadata'
       );
-      
-      return Right(UserEntity(
-        id: response.user!.id,
-        email: response.user!.email!,
-      ));
+
+      if (response.user == null) {
+        return Left(ServerFailure('Registration failed'));
+      }
+
+      // Auto-login después del signup para persistir la sesión
+      await supabaseClient.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      return Right(
+        UserEntity(id: response.user!.id, email: response.user!.email!),
+      );
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
-    } catch (e) {
-      return Left(ServerFailure("Unexpected error during registration"));
     }
   }
 

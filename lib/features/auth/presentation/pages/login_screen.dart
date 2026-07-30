@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:drip_ui/drip_ui.dart';
 import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,13 +40,13 @@ class _LoginScreenState extends State<LoginScreen> {
       listener: (context, state) {
         if (state is Authenticated) {
           // Navegar a la pantalla principal
-          Navigator.pushReplacementNamed(context, '/home');
+          context.go('/home');
         } else if (state is AuthError) {
           // Mostrar mensaje de error
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
-            ), // Acceso al mensaje del BLoC[cite: 26]
+            ),
           );
         }
       },
@@ -137,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const Text('Don\'t have a family account? '),
                     GestureDetector(
-                      onTap: () => Navigator.of(context).pushNamed('/signup'),
+                      onTap: () => context.push('/signup'),
                       child: const Text(
                         'Sign Up',
                         style: TextStyle(fontWeight: FontWeight.bold),
