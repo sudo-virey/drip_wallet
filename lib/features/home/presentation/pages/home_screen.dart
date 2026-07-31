@@ -35,6 +35,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _selectedMonth = DateTime.now();
+    
+    // Recargar dashboard cuando se regresa al Home desde otra pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        context.read<FinanceBloc>().add(LoadDashboard(authState.user.id));
+      }
+    });
   }
 
   @override
@@ -152,7 +160,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
 
-              return const SizedBox.shrink();
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
             },
           ),
         ),
@@ -161,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
-            backgroundColor: Colors.green.shade400,
+            backgroundColor: Theme.of(context).colorScheme.secondary,
             heroTag: 'income_btn',
             onPressed: () {
               showModalBottomSheet(
@@ -176,11 +186,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (context) => const IncomeTransactionModal(),
               );
             },
-            child: const Icon(Icons.trending_up, color: Colors.white, size: 24),
+            child: Icon(Icons.trending_up, color: Theme.of(context).colorScheme.onSecondary, size: 24),
           ),
           const SizedBox(height: 12),
           FloatingActionButton(
-            backgroundColor: Colors.red.shade400,
+            backgroundColor: Theme.of(context).colorScheme.error,
             heroTag: 'expense_btn',
             onPressed: () {
               showModalBottomSheet(
@@ -195,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (context) => const ExpenseTransactionModal(),
               );
             },
-            child: const Icon(Icons.trending_down, color: Colors.white, size: 24),
+            child: Icon(Icons.trending_down, color: Theme.of(context).colorScheme.onError, size: 24),
           ),
         ],
       ),
@@ -235,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
                 },
-                child: const Icon(Icons.chevron_left, size: 22, color: Color(0xFF0066FF)),
+                child: Icon(Icons.chevron_left, size: 22, color: Theme.of(context).colorScheme.primary),
               ),
             ),
           ),
@@ -247,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
+                  color: Theme.of(context).colorScheme.onSurface,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -258,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Mes actual',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7) ?? Colors.grey.shade500,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -287,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
                 },
-                child: const Icon(Icons.chevron_right, size: 22, color: Color(0xFF0066FF)),
+                child: Icon(Icons.chevron_right, size: 22, color: Theme.of(context).colorScheme.primary),
               ),
             ),
           ),
@@ -333,7 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Color(0xFFB0D4FF),
+              color: Colors.white70,
               letterSpacing: 1,
             ),
           ),
@@ -355,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Text(
                     'Gastado',
-                    style: TextStyle(fontSize: 12, color: Color(0xFFB0D4FF)),
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -373,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Text(
                     'Presupuesto',
-                    style: TextStyle(fontSize: 12, color: Color(0xFFB0D4FF)),
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -496,10 +506,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+                        color: Theme.of(context).colorScheme.errorContainer,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+                          color: Theme.of(context).colorScheme.error.withOpacity(0.25),
                         ),
                       ),
                       child: Column(
@@ -517,16 +527,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 'Gastos Fijos',
                                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.onErrorContainer,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            '\$${expenseTotal.toStringAsFixed(2)}',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.error,
+                          Center(
+                            child: Text(
+                              '\$${expenseTotal.toStringAsFixed(2)}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onErrorContainer,
+                              ),
                             ),
                           ),
                         ],
@@ -550,10 +563,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                        color: Theme.of(context).colorScheme.secondaryContainer,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.3),
+                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.25),
                         ),
                       ),
                       child: Column(
@@ -571,16 +584,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 'Ingresos Fijos',
                                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.onSecondaryContainer,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            '\$${incomeTotal.toStringAsFixed(2)}',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.secondary,
+                          Center(
+                            child: Text(
+                              '\$${incomeTotal.toStringAsFixed(2)}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSecondaryContainer,
+                              ),
                             ),
                           ),
                         ],
@@ -605,15 +621,15 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).textTheme.headlineMedium?.color ?? Colors.black,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         TextButton(
           onPressed: () {},
-          child: const Text(
+          child: Text(
             'Ver Todo',
             style: TextStyle(
-              color: Color(0xFF0066FF),
+              color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -736,21 +752,21 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Theme.of(context).dividerColor, width: 1),
+                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         _getIconFromName(transaction.icon),
-                        color: const Color(0xFF001F3F),
+                        color: Theme.of(context).colorScheme.primary,
                         size: 24,
                       ),
                     ),
@@ -764,7 +780,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -772,7 +788,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             transaction.category,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey.shade600,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -783,7 +799,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: transaction.type == 'expense' ? Colors.red : Colors.green,
+                        color: transaction.type == 'expense'
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                   ],

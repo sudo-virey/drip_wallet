@@ -114,3 +114,17 @@ class UpdateTransaction extends FinanceEvent {
   @override
   List<Object?> get props => [profileId, transactionId, transactionData];
 }
+
+/// Evento para cargar TODAS las transacciones de un mes (para History/Historial)
+class LoadHistoryForMonth extends FinanceEvent {
+  final String profileId;
+  final DateTime month;
+
+  const LoadHistoryForMonth({
+    required this.profileId,
+    required this.month,
+  });
+
+  @override
+  List<Object?> get props => [profileId, month];
+}

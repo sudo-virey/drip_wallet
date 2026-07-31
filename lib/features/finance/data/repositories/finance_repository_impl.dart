@@ -125,4 +125,25 @@ class FinanceRepositoryImpl implements FinanceRepository {
       return Left(ServerFailure('Unexpected error: $e'));
     }
   }
+
+  @override
+  Future<Either<Failure, List<TransactionEntity>>> fetchAllTransactionsForMonth(
+    String profileId,
+    DateTime month,
+  ) async {
+    try {
+      final transactionModels = await remoteDataSource.fetchAllTransactionsForMonth(
+        profileId,
+        month,
+      );
+      final entities = transactionModels
+          .map((model) => model.toEntity())
+          .toList();
+      return Right(entities);
+    } on Exception catch (e) {
+      return Left(ServerFailure(e.toString()));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
 }

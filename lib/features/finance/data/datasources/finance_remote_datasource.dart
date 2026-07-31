@@ -12,6 +12,13 @@ abstract class FinanceRemoteDataSource {
     DateTime month,
   );
 
+  /// Obtiene TODAS las transacciones de un mes específico (para History/Historial)
+  /// Devuelve todas las transacciones del mes sin limitar al último día
+  Future<List<TransactionModel>> fetchAllTransactionsForMonth(
+    String profileId,
+    DateTime month,
+  );
+
   /// Agrega una nueva transacción en Supabase
   Future<TransactionModel> addExpense(
     String profileId,
@@ -332,6 +339,51 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         budgetLimit: 0,
         recentTransactions: [],
       );
+    }
+  }
+
+  @override
+  Future<List<TransactionModel>> fetchAllTransactionsForMonth(
+    String profileId,
+    DateTime month,
+  ) async {
+    try {
+      // Cargar categorías desde BD si no están cacheadas
+      await _loadCategories();
+      
+      final startOfMonth = DateTime(month.year, month.month, 1);
+      final endOfMonth = DateTime(month.year, month.month + 1, 1);
+
+      // Obtener TODAS las transacciones del mes seleccionado (sin limitar al último día)
+      final expensesResponse = await supabaseClient
+          .from('expenses')
+          .select('id, amount, description, type, created_at, category_id, profile_id, is_deleted')
+          .eq('profile_id', profileId)
+          .neq('is_deleted', true)
+          .gte('created_at', startOfMonth.toIso8601String())
+          .lt('created_at', endOfMonth.toIso8601String())
+          .order('created_at', ascending: false);
+
+      final expenses = (expensesResponse as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+      // Convertir a TransactionModel
+      final transactionModels = expenses
+          .map((e) => TransactionModel(
+            id: e['id'] as String? ?? '',
+            title: e['description'] as String? ?? 'Transaction',
+            category: _getCategoryName(e['category_id'] as String?),
+            amount: (e['amount'] as num?)?.toDouble() ?? 0.0,
+            date: e['created_at'] != null ? DateTime.parse(e['created_at'] as String) : DateTime.now(),
+            type: e['type'] as String? ?? 'expense',
+            description: e['description'] as String? ?? '',
+            icon: _getCategoryIcon(e['category_id'] as String?),
+          ))
+          .toList();
+
+      return transactionModels;
+    } catch (e) {
+      print('ERROR fetching all transactions for month: $e');
+      return [];
     }
   }
 

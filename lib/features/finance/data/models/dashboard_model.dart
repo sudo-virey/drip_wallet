@@ -90,4 +90,18 @@ class TransactionModel extends TransactionEntity {
       'description': description,
     };
   }
+
+  /// Convierte TransactionModel a TransactionEntity
+  TransactionEntity toEntity() {
+    return TransactionEntity(
+      id: id,
+      title: title,
+      category: category,
+      amount: amount,
+      date: date,
+      type: type,
+      description: description,
+      icon: icon,
+    );
+  }
 }

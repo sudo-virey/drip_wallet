@@ -9,6 +9,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   FinanceBloc(this.repository) : super(const FinanceInitial()) {
     on<LoadDashboard>(_onLoadDashboard);
     on<LoadDashboardForMonth>(_onLoadDashboardForMonth);
+    on<LoadHistoryForMonth>(_onLoadHistoryForMonth);
     on<AddTransaction>(_onAddTransaction);
     on<RefreshDashboard>(_onRefreshDashboard);
     on<SetMonthlyBudget>(_onSetMonthlyBudget);
@@ -201,6 +202,26 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
         // Refrescar el dashboard después de actualizar
         add(RefreshDashboard(event.profileId));
       },
+    );
+  }
+
+  /// Maneja el evento LoadHistoryForMonth
+  /// 
+  /// Carga TODAS las transacciones de un mes específico para la pantalla de historial
+  Future<void> _onLoadHistoryForMonth(
+    LoadHistoryForMonth event,
+    Emitter<FinanceState> emit,
+  ) async {
+    emit(const FinanceLoading());
+
+    final result = await repository.fetchAllTransactionsForMonth(
+      event.profileId,
+      event.month,
+    );
+
+    result.fold(
+      (failure) => emit(FinanceError(failure.message)),
+      (transactions) => emit(HistoryLoaded(transactions)),
     );
   }
 }

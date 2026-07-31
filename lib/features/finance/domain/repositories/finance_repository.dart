@@ -78,4 +78,13 @@ abstract class FinanceRepository {
     String transactionId,
     Map<String, dynamic> data,
   );
+
+  /// Obtiene TODAS las transacciones de un mes específico para la pantalla de historial
+  /// 
+  /// Devuelve una lista de [TransactionEntity] ordenada por fecha (más reciente primero)
+  /// sin filtrar por día como lo hace fetchDashboardDataForMonth
+  Future<Either<Failure, List<TransactionEntity>>> fetchAllTransactionsForMonth(
+    String profileId,
+    DateTime month,
+  );
 }

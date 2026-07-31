@@ -1,5 +1,6 @@
 // lib/features/history/presentation/pages/history_screen.dart
 import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
+import 'package:drip_wallet/core/utils/icon_converter.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
@@ -20,59 +21,64 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedDateFilter = 'Este Mes';
 
   // Cargar categorías dinámicamente desde la BD
-  List<String> _categories = ['Todas las Categorías'];
+  List<Map<String, dynamic>> _categories = [];
+  final List<String> _dateFilterOptions = [
+    'Hoy',
+    'Esta Semana',
+    'Este Mes',
+    'Últimos 3 Meses',
+    'Este Año',
+    'Todas'
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadCategories();
     
-    // Cargar dashboard con transacciones
-    final authState = context.read<AuthBloc>().state;
-    if (authState is Authenticated) {
-      context.read<FinanceBloc>().add(LoadDashboard(authState.user.id));
-    }
+    // Cargar transacciones del mes actual para History
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        final now = DateTime.now();
+        context.read<FinanceBloc>().add(
+          LoadHistoryForMonth(
+            profileId: authState.user.id,
+            month: now,
+          ),
+        );
+      }
+    });
   }
 
   /// Cargar categorías dinámicamente desde la BD
   Future<void> _loadCategories() async {
     try {
       final supabaseClient = getIt<SupabaseClient>();
-      print('DEBUG history: Iniciando carga de categorías...');
-      
-      // Primero: Ver TODOS los registros sin filtro
-      final allResponse = await supabaseClient
-          .from('categories')
-          .select('*');
-      print('DEBUG: Total categorías sin filtro: ${(allResponse as List).length}');
-      print('DEBUG: Datos completos: $allResponse');
       
       final response = await supabaseClient
           .from('categories')
-          .select('id, name, type')
+          .select('id, name, icon, type')
           .order('name');
       
-      print('DEBUG: Categorías cargadas: ${(response as List).length} items');
-      print('DEBUG: Datos: $response');
-      
       if (mounted) {
-        final categoryNames = (response as List)
-            .map((e) => e['name'] as String)
-            .toSet()
-            .toList();
+        final List<Map<String, dynamic>> uniqueCategories = [];
+        final Set<String> seenNames = {};
         
-        categoryNames.sort();
-        
-        print('DEBUG: Nombres únicos: $categoryNames');
+        for (final category in response) {
+          final name = category['name'] as String;
+          if (!seenNames.contains(name)) {
+            uniqueCategories.add(category);
+            seenNames.add(name);
+          }
+        }
         
         setState(() {
-          _categories = ['Todas las Categorías', ...categoryNames];
-          print('DEBUG: Categorías finales: $_categories');
+          _categories = uniqueCategories;
         });
       }
-    } catch (e, stackTrace) {
-      print('ERROR CRÍTICO cargando categorías: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
+      print('ERROR cargando categorías: $e');
     }
   }
 
@@ -82,12 +88,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          'Presupuesto Familiar',
+        title: Text(
+          'Historial',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         centerTitle: false,
@@ -98,7 +104,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.account_balance_wallet,
+            child: Icon(Icons.history,
                 color: context.dripTheme.primaryColor, size: 20),
           ),
         ],
@@ -111,26 +117,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
             );
           }
 
-          if (state is DashboardLoaded) {
-            final dashboard = state.dashboard;
-            final transactions = dashboard.recentTransactions;
+          if (state is HistoryLoaded) {
+            final allTransactions = state.transactions;
 
-            // Agrupar transacciones por fecha
+            // Aplicar filtros
+            final filteredTransactions = _applyFilters(allTransactions);
+
+            // Agrupar transacciones filtradas por fecha
             final Map<String, List<TransactionEntity>> groupedTxs = {};
-            for (var tx in transactions) {
+            for (var tx in filteredTransactions) {
               final dateKey = _formatDateHeader(tx.date);
               groupedTxs.putIfAbsent(dateKey, () => []).add(tx);
             }
 
+            // Ordenar las fechas en orden descendente (más recientes primero)
+            final sortedDateKeys = groupedTxs.keys.toList();
+            sortedDateKeys.sort((a, b) {
+              // Extraer la fecha de la clave para comparar
+              final dateA = _extractDateFromKey(a);
+              final dateB = _extractDateFromKey(b);
+              return dateB.compareTo(dateA);
+            });
+
             return Column(
               children: [
                 _buildFilters(),
-                if (transactions.isEmpty)
+                if (filteredTransactions.isEmpty)
                   Expanded(
                     child: Center(
-                      child: Text(
-                        'No transactions yet',
-                        style: TextStyle(color: Colors.grey.shade600),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inbox, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No hay transacciones',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
@@ -139,9 +167,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     child: ListView.builder(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 24, vertical: 16),
-                      itemCount: groupedTxs.length,
+                      itemCount: sortedDateKeys.length,
                       itemBuilder: (context, dateIndex) {
-                        final dateKey = groupedTxs.keys.toList()[dateIndex];
+                        final dateKey = sortedDateKeys[dateIndex];
                         final txList = groupedTxs[dateKey]!;
 
                         return Column(
@@ -150,10 +178,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             // Date Header
                             Text(
                               dateKey,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 letterSpacing: 1,
                               ),
                             ),
@@ -163,8 +191,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               txList.length,
                               (txIndex) {
                                 final tx = txList[txIndex];
-                                final icon =
-                                    _getIconForCategory(tx.category);
+                                final icon = stringToIconData(tx.icon ?? 'category');
+                                
+                                final isExpense = tx.type == 'expense';
+                                final amountColor = isExpense ? Colors.red : Colors.green;
 
                                 return Padding(
                                   padding:
@@ -172,11 +202,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: Theme.of(context).colorScheme.surface,
                                       borderRadius:
                                           BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: Colors.grey.shade200,
+                                        color: Theme.of(context).colorScheme.outlineVariant,
                                         width: 1,
                                       ),
                                     ),
@@ -187,15 +217,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                           width: 56,
                                           height: 56,
                                           decoration: BoxDecoration(
-                                            color: Colors.grey.shade200,
+                                            color: isExpense 
+                                              ? Colors.red.withOpacity(0.1)
+                                              : Colors.green.withOpacity(0.1),
                                             borderRadius:
                                                 BorderRadius.circular(12),
                                           ),
                                           child: Center(
                                             child: Icon(
                                               icon,
-                                              color: const Color(
-                                                  0xFF001F3F),
+                                              color: isExpense ? Colors.red : Colors.green,
                                               size: 28,
                                             ),
                                           ),
@@ -210,11 +241,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             children: [
                                               Text(
                                                 tx.title,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 16,
                                                   fontWeight:
                                                       FontWeight.w600,
-                                                  color: Colors.black,
+                                                  color: Theme.of(context).colorScheme.onSurface,
                                                 ),
                                               ),
                                               const SizedBox(height: 4),
@@ -231,13 +262,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         ),
                                         // Amount
                                         Text(
-                                          '${tx.type == 'expense' ? '-' : '+'}\$${tx.amount.toStringAsFixed(2)}',
+                                          '${isExpense ? '-' : '+'}\$${tx.amount.toStringAsFixed(2)}',
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w600,
-                                            color: tx.type == 'expense'
-                                                ? Colors.red
-                                                : Colors.green,
+                                            color: amountColor,
                                           ),
                                         ),
                                       ],
@@ -269,7 +298,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             );
           }
 
-          return const SizedBox.shrink();
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
         },
       ),
     );
@@ -284,90 +315,92 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Transactions',
+              Text(
+                'Transacciones',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
-              GestureDetector(
-                onTap: () {},
-                child: Icon(Icons.tune, color: Colors.grey.shade700, size: 24),
-              ),
+              Icon(Icons.tune, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 24),
             ],
           ),
         ),
 
-        // Category Filters
+        // Category Filters (Horizontal scroll)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: List.generate(
-                _categories.length,
-                (index) {
-                  final category = _categories[index];
-                  final isSelected = _selectedCategory == category;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: GestureDetector(
+              children: [
+                // "Todas las Categorías" button
+                _buildCategoryButton(
+                  label: 'Todas',
+                  isSelected: _selectedCategory == 'Todas las Categorías',
+                  onTap: () {
+                    setState(() {
+                      _selectedCategory = 'Todas las Categorías';
+                    });
+                  },
+                ),
+                // Individual category buttons
+                ...List.generate(
+                  _categories.length,
+                  (index) {
+                    final category = _categories[index];
+                    final categoryName = category['name'] as String;
+                    final isSelected = _selectedCategory == categoryName;
+                    
+                    return _buildCategoryButton(
+                      label: categoryName,
+                      isSelected: isSelected,
                       onTap: () {
-                        setState(() => _selectedCategory = category);
+                        setState(() {
+                          _selectedCategory = categoryName;
+                        });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? context.dripTheme.primaryColor
-                              : Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          category,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: isSelected ? Colors.white : Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ),
         const SizedBox(height: 12),
 
-        // Date Filter
+        // Date Filter Dropdown
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.calendar_today,
-                    color: Colors.grey.shade600, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  _selectedDateFilter,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
+          child: GestureDetector(
+            onTap: () => _showDateFilterMenu(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today,
+                      color: context.dripTheme.primaryColor, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedDateFilter,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Icon(Icons.arrow_drop_down,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
+                ],
+              ),
             ),
           ),
         ),
@@ -376,19 +409,166 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  /// Mapear categoría a icono
-  IconData _getIconForCategory(String category) {
-    final iconMap = {
-      'Food': Icons.restaurant,
-      'Transit': Icons.directions_car,
-      'Bills': Icons.receipt,
-      'Shop': Icons.shopping_bag,
-      'Home': Icons.home,
-      'Fun': Icons.sentiment_satisfied,
-      'Other': Icons.more_horiz,
-    };
-    return iconMap[category] ?? Icons.shopping_cart;
+  /// Construir botón de categoría
+  Widget _buildCategoryButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? context.dripTheme.primaryColor
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
   }
+
+  /// Mostrar menú de filtro de fecha
+  void _showDateFilterMenu() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Seleccionar Período',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            ListView.builder(
+              shrinkWrap: true,
+              itemCount: _dateFilterOptions.length,
+              itemBuilder: (context, index) {
+                final option = _dateFilterOptions[index];
+                final isSelected = _selectedDateFilter == option;
+                
+                return ListTile(
+                  title: Text(option),
+                  leading: isSelected
+                      ? Icon(Icons.check_circle,
+                          color: context.dripTheme.primaryColor)
+                      : Icon(Icons.radio_button_unchecked,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  onTap: () {
+                    setState(() => _selectedDateFilter = option);
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Aplicar filtros de categoría y fecha a las transacciones
+  List<TransactionEntity> _applyFilters(List<TransactionEntity> transactions) {
+    return transactions.where((tx) {
+      // Filtro de categoría
+      final categoryMatches = _selectedCategory == 'Todas las Categorías' ||
+          tx.category == _selectedCategory;
+
+      // Filtro de fecha
+      final dateMatches = _isWithinDateRange(tx.date);
+
+      return categoryMatches && dateMatches;
+    }).toList();
+  }
+
+  /// Verificar si una fecha está dentro del rango seleccionado
+  bool _isWithinDateRange(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final txDate = DateTime(date.year, date.month, date.day);
+
+    switch (_selectedDateFilter) {
+      case 'Hoy':
+        return txDate == today;
+
+      case 'Esta Semana':
+        // Lunes de esta semana
+        final weekStart = today.subtract(Duration(days: today.weekday - 1));
+        // Domingo de esta semana (o próximo domingo si hoy es domingo)
+        final weekEnd = today.add(Duration(days: 7 - today.weekday));
+        // Incluir desde lunes hasta domingo (inclusive)
+        return !txDate.isBefore(weekStart) && !txDate.isAfter(weekEnd);
+
+      case 'Este Mes':
+        return date.month == now.month && date.year == now.year;
+
+      case 'Últimos 3 Meses':
+        final threeMonthsAgo = DateTime(now.year, now.month - 3, now.day);
+        return !date.isBefore(threeMonthsAgo) && !date.isAfter(now);
+
+      case 'Este Año':
+        return date.year == now.year;
+
+      case 'Todas':
+        return true;
+
+      default:
+        return true;
+    }
+  }
+
+  /// Extraer fecha de la clave del header para ordenar
+  DateTime _extractDateFromKey(String key) {
+    try {
+      // Parsear fechas como "TODAY, OCT 24", "YESTERDAY, OCT 24", "OCT 24"
+      final parts = key.split(', ');
+      final dateStr = parts.length > 1 ? parts[1] : key;
+      
+      final now = DateTime.now();
+      final monthDayParts = dateStr.split(' ');
+      
+      if (monthDayParts.length == 2) {
+        final monthStr = monthDayParts[0];
+        final dayStr = monthDayParts[1];
+        
+        final months = [
+          'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+          'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+        ];
+        
+        final monthIndex = months.indexOf(monthStr);
+        final day = int.tryParse(dayStr) ?? 1;
+        
+        if (monthIndex >= 0) {
+          return DateTime(now.year, monthIndex + 1, day);
+        }
+      }
+    } catch (e) {
+      print('Error parsing date key: $key - $e');
+    }
+    
+    return DateTime.now();
+  }
+
 
   /// Formatear fecha para header (ej: "TODAY, OCT 24")
   String _formatDateHeader(DateTime date) {
@@ -403,9 +583,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     ];
 
     if (dateOnly == today) {
-      return 'TODAY, ${months[date.month - 1]} ${date.day}';
+      return 'HOY, ${months[date.month - 1]} ${date.day}';
     } else if (dateOnly == yesterday) {
-      return 'YESTERDAY, ${months[date.month - 1]} ${date.day}';
+      return 'AYER, ${months[date.month - 1]} ${date.day}';
     } else {
       return '${months[date.month - 1]} ${date.day}';
     }
@@ -413,7 +593,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// Formatear hora de la transacción (ej: "2:30 PM")
   String _formatTime(DateTime date) {
-    final hour = date.hour > 12 ? date.hour - 12 : date.hour;
+    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
     final period = date.hour >= 12 ? 'PM' : 'AM';
     final minute = date.minute.toString().padLeft(2, '0');
     return '$hour:$minute $period';

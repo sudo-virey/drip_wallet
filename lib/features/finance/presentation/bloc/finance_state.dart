@@ -67,3 +67,13 @@ class BudgetFetched extends FinanceState {
   @override
   List<Object?> get props => [budget];
 }
+
+/// Estado cuando se han cargado todas las transacciones de un mes (para History/Historial)
+class HistoryLoaded extends FinanceState {
+  final List<TransactionEntity> transactions;
+
+  const HistoryLoaded(this.transactions);
+
+  @override
+  List<Object?> get props => [transactions];
+}
