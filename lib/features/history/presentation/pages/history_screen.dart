@@ -280,11 +280,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _generateAndShareReport,
-        icon: const Icon(Icons.download),
-        label: const Text('Descargar Reporte'),
-      ),
     );
   }
 
@@ -434,7 +429,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: _generateAndShareReport,
+                icon: const Icon(Icons.download, size: 16),
+                label: const Text('Descargar Reporte'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
