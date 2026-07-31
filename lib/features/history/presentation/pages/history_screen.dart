@@ -85,30 +85,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          'Historial',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        centerTitle: false,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.history,
-                color: context.dripTheme.primaryColor, size: 20),
-          ),
-        ],
-      ),
       body: BlocBuilder<FinanceBloc, FinanceState>(
         builder: (context, state) {
           if (state is FinanceLoading) {
@@ -120,30 +96,40 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (state is HistoryLoaded) {
             final allTransactions = state.transactions;
 
-            // Aplicar filtros
             final filteredTransactions = _applyFilters(allTransactions);
 
-            // Agrupar transacciones filtradas por fecha
             final Map<String, List<TransactionEntity>> groupedTxs = {};
             for (var tx in filteredTransactions) {
               final dateKey = _formatDateHeader(tx.date);
               groupedTxs.putIfAbsent(dateKey, () => []).add(tx);
             }
 
-            // Ordenar las fechas en orden descendente (más recientes primero)
             final sortedDateKeys = groupedTxs.keys.toList();
             sortedDateKeys.sort((a, b) {
-              // Extraer la fecha de la clave para comparar
               final dateA = _extractDateFromKey(a);
               final dateB = _extractDateFromKey(b);
               return dateB.compareTo(dateA);
             });
 
-            return Column(
-              children: [
-                _buildFilters(),
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                    child: Text(
+                      'Historial',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(child: _buildFilters()),
                 if (filteredTransactions.isEmpty)
-                  Expanded(
+                  SliverFillRemaining(
+                    hasScrollBody: false,
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -163,122 +149,110 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   )
                 else
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 16),
-                      itemCount: sortedDateKeys.length,
-                      itemBuilder: (context, dateIndex) {
-                        final dateKey = sortedDateKeys[dateIndex];
-                        final txList = groupedTxs[dateKey]!;
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Date Header
-                            Text(
-                              dateKey,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            // Transactions for this date
-                            ...List.generate(
-                              txList.length,
-                              (txIndex) {
-                                final tx = txList[txIndex];
-                                final icon = stringToIconData(tx.icon ?? 'category');
-                                
-                                final isExpense = tx.type == 'expense';
-                                final amountColor = isExpense ? Colors.red : Colors.green;
-
-                                return Padding(
-                                  padding:
-                                      const EdgeInsets.only(bottom: 12),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.surface,
-                                      borderRadius:
-                                          BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: Theme.of(context).colorScheme.outlineVariant,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        // Icon
-                                        Container(
-                                          width: 56,
-                                          height: 56,
-                                          decoration: BoxDecoration(
-                                            color: isExpense 
-                                              ? Colors.red.withOpacity(0.1)
-                                              : Colors.green.withOpacity(0.1),
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                          child: Center(
-                                            child: Icon(
-                                              icon,
-                                              color: isExpense ? Colors.red : Colors.green,
-                                              size: 28,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        // Details
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment
-                                                    .start,
-                                            children: [
-                                              Text(
-                                                tx.title,
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight:
-                                                      FontWeight.w600,
-                                                  color: Theme.of(context).colorScheme.onSurface,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '${tx.category} • ${_formatTime(tx.date)}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors
-                                                      .grey.shade600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        // Amount
-                                        Text(
-                                          '${isExpense ? '-' : '+'}\$${tx.amount.toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: amountColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate(
+                        [
+                          for (final dateKey in sortedDateKeys) ...[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dateKey,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    letterSpacing: 1,
                                   ),
-                                );
-                              },
+                                ),
+                                const SizedBox(height: 12),
+                                ...List.generate(
+                                  groupedTxs[dateKey]!.length,
+                                  (txIndex) {
+                                    final tx = groupedTxs[dateKey]![txIndex];
+                                    final icon = stringToIconData(tx.icon ?? 'category');
+                                    final isExpense = tx.type == 'expense';
+                                    final amountColor = isExpense ? Colors.red : Colors.green;
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: Theme.of(context).colorScheme.outlineVariant,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 56,
+                                              height: 56,
+                                              decoration: BoxDecoration(
+                                                color: isExpense
+                                                    ? Colors.red.withOpacity(0.1)
+                                                    : Colors.green.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Center(
+                                                child: Icon(
+                                                  icon,
+                                                  color: isExpense
+                                                      ? Theme.of(context).colorScheme.error
+                                                      : Theme.of(context).colorScheme.secondary,
+                                                  size: 28,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    tx.title,
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Theme.of(context).colorScheme.onSurface,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    '${tx.category} • ${_formatTime(tx.date)}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Text(
+                                              '${isExpense ? '-' : '+'}\$${tx.amount.toStringAsFixed(2)}',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: amountColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                              ],
                             ),
-                            const SizedBox(height: 20),
                           ],
-                        );
-                      },
+                        ],
+                      ),
                     ),
                   ),
               ],
@@ -309,25 +283,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildFilters() {
     return Column(
       children: [
-        // Transactions Header
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Transacciones',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              Icon(Icons.tune, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 24),
-            ],
-          ),
-        ),
-
         // Category Filters (Horizontal scroll)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
