@@ -8,6 +8,7 @@ import 'package:drip_wallet/features/auth/presentation/pages/sign_up_screen.dart
 import 'package:drip_wallet/features/home/presentation/pages/home_screen.dart';
 import 'package:drip_wallet/features/history/presentation/pages/history_screen.dart';
 import 'package:drip_wallet/features/profile/presentation/pages/profile_screen.dart';
+import 'package:drip_wallet/features/finance/presentation/pages/budget_setup_screen.dart';
 
 
 // En app_router.dart
@@ -40,6 +41,7 @@ GoRouter createRouter(AuthBloc authBloc) {
           StatefulShellBranch(routes: [GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen())]),
         ],
       ),
+      GoRoute(path: '/budget-setup', builder: (context, state) => const BudgetSetupScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (context, state) => const SignUpScreen()),
     ],
