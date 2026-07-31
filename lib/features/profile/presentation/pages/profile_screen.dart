@@ -5,8 +5,12 @@ import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_event.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
+import 'package:drip_wallet/features/finance/data/datasources/finance_remote_datasource.dart';
+import 'package:drip_wallet/features/finance/finance_exports.dart';
 import 'package:drip_wallet/features/profile/data/repositories/profile_repository.dart';
+import 'package:drip_wallet/injection_container.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 class ProfileScreen extends StatefulWidget {
@@ -20,8 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final ProfileRepository _profileRepo;
   Map<String, dynamic>? _profileData;
   bool _isLoading = true;
-  bool _notificationsEnabled = true;
-  bool _lightModeEnabled = false;
 
   @override
   void initState() {
@@ -80,13 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 24),
                     _buildProfileHeader(),
                     const SizedBox(height: 40),
-                    _buildAccountSection(),
-                    const SizedBox(height: 24),
                     _buildFamilySection(),
-                    const SizedBox(height: 24),
-                    _buildAppSettingsSection(),
-                    const SizedBox(height: 24),
-                    _buildSupportSection(),
                     const SizedBox(height: 32),
                     _buildLogoutButton(),
                     const SizedBox(height: 16),
@@ -201,157 +197,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildAccountSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Cuenta'),
-        _buildMenuOption('Información Personal', Icons.person_outline),
-        const SizedBox(height: 12),
-        _buildMenuOption('Seguridad', Icons.shield_outlined),
-        const SizedBox(height: 12),
-        _buildMenuOption('Cuentas Bancarias Vinculadas', Icons.account_balance_outlined),
-      ],
-    );
-  }
-
   Widget _buildFamilySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Familia'),
-        _buildMenuOption('Miembros de la Familia', Icons.people_outline),
-        const SizedBox(height: 12),
         _buildInviteButton(),
-        const SizedBox(height: 12),
-        _buildMenuOption('Límites de Presupuesto', Icons.trending_up_outlined),
       ],
     );
   }
 
-  Widget _buildAppSettingsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Configuración de la Aplicación'),
-        _buildToggleOption(
-          'Notificaciones',
-          Icons.notifications_outlined,
-          _notificationsEnabled,
-          (value) {
-            setState(() => _notificationsEnabled = value);
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildToggleOption(
-          'Modo Claro',
-          Icons.light_mode_outlined,
-          _lightModeEnabled,
-          (value) {
-            setState(() => _lightModeEnabled = value);
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildMenuOption('Moneda', Icons.attach_money_outlined, showValue: 'USD (\\\$)'),
-      ],
-    );
-  }
 
-  Widget _buildSupportSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Soporte'),
-        _buildMenuOption('Centro de Ayuda', Icons.help_outline),
-        const SizedBox(height: 12),
-        _buildMenuOption('Política de Privacidad', Icons.privacy_tip_outlined),
-      ],
-    );
-  }
 
-  Widget _buildMenuOption(
-    String title,
-    IconData icon, {
-    String? showValue,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: context.dripInputBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.dripInputBackground,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: context.dripPrimary),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-          ),
-          if (showValue != null)
-            Text(
-              showValue,
-              style: TextStyle(
-                fontSize: 14,
-                color: context.dripHint,
-              ),
-            ),
-          if (showValue == null)
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: context.dripHint,
-            ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildToggleOption(
-    String title,
-    IconData icon,
-    bool value,
-    Function(bool) onChanged,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: context.dripInputBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.dripInputBackground,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: context.dripPrimary),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: context.dripPrimary,
-          ),
-        ],
-      ),
-    );
-  }
+
+
+
+
 
   Widget _buildInviteButton() {
     return GestureDetector(
-      onTap: () {},
+      onTap: _showBudgetSharingDialog,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
@@ -364,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(Icons.person_add_outlined, color: context.dripPrimary, size: 18),
             const SizedBox(width: 8),
             Text(
-              'Invitar a la Familia',
+              'Compartir presupuesto',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -374,6 +240,158 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showBudgetSharingDialog() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) return;
+
+    final financeDatasource = getIt<FinanceRemoteDataSource>();
+    Map<String, dynamic>? family;
+
+    try {
+      family = await financeDatasource.getBudgetFamilyForProfile(authState.user.id);
+    } catch (_) {
+      family = null;
+    }
+
+    if (!mounted) return;
+
+    final inviteCodeController = TextEditingController();
+
+    Future<void> _refreshFinanceData() async {
+      if (!mounted) return;
+
+      final financeBloc = context.read<FinanceBloc>();
+      financeBloc.add(LoadDashboard(authState.user.id));
+      financeBloc.add(
+        LoadHistoryForMonth(
+          profileId: authState.user.id,
+          month: DateTime.now(),
+        ),
+      );
+    }
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final inviteCode = family?['invite_code'] as String? ?? '';
+
+            Future<void> createFamily() async {
+              try {
+                final created = await financeDatasource.createBudgetFamily(authState.user.id);
+                family = created;
+                await Clipboard.setData(ClipboardData(text: created['invite_code'] as String));
+                if (mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(content: Text('Código creado y copiado: ${created['invite_code']}')),
+                  );
+                }
+                setDialogState(() {});
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+
+              await _refreshFinanceData();
+            }
+
+            Future<void> joinFamily() async {
+              final code = inviteCodeController.text.trim();
+              if (code.isEmpty) return;
+
+              try {
+                await financeDatasource.joinBudgetFamily(authState.user.id, code);
+                if (mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(content: Text('Te uniste al presupuesto compartido')),
+                  );
+                }
+                if (Navigator.of(dialogContext).canPop()) {
+                  Navigator.pop(dialogContext);
+                }
+                await _refreshFinanceData();
+                if (mounted) {
+                  context.go('/home');
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Compartir presupuesto'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    family != null
+                        ? 'Este es el código que debes compartir con tu familiar.'
+                        : 'Crea un grupo para compartir el mismo presupuesto con un familiar.',
+                  ),
+                  const SizedBox(height: 16),
+                  if (family != null) ...[
+                    SelectableText(
+                      inviteCode,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () async {
+                        final code = inviteCode;
+                        if (code.isEmpty) return;
+                        await Clipboard.setData(ClipboardData(text: code));
+                        if (mounted) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(content: Text('Código copiado')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copiar código'),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    controller: inviteCodeController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Código de invitación',
+                      hintText: 'ABC123',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cerrar'),
+                ),
+                if (family == null)
+                  TextButton(
+                    onPressed: createFamily,
+                    child: const Text('Crear grupo'),
+                  ),
+                TextButton(
+                  onPressed: joinFamily,
+                  child: const Text('Unirme'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
