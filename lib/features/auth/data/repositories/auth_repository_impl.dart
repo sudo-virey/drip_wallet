@@ -45,18 +45,30 @@ class AuthRepositoryImpl implements AuthRepository {
         data: {'name': name}, // Pasamos el nombre en el 'user_metadata'
       );
 
-      if (response.user == null) {
+      final signedUpUser = response.session?.user ?? response.user;
+      if (signedUpUser == null) {
         return Left(ServerFailure('Registration failed'));
       }
 
-      // Auto-login después del signup para persistir la sesión
-      await supabaseClient.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      if (response.session == null) {
+        try {
+          await supabaseClient.auth.signInWithPassword(
+            email: email,
+            password: password,
+          );
+        } catch (_) {
+          // If auto-login fails, keep the signup result and let the caller
+          // react to the actual auth state instead of blocking the flow.
+        }
+      }
+
+      final currentUser = supabaseClient.auth.currentUser;
+      if (currentUser == null) {
+        return Left(ServerFailure('Registration failed'));
+      }
 
       return Right(
-        UserEntity(id: response.user!.id, email: response.user!.email!),
+        UserEntity(id: currentUser.id, email: currentUser.email ?? email),
       );
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
