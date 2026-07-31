@@ -3,8 +3,14 @@ import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
-import 'package:drip_wallet/features/home/presentation/widgets/new_expense_modal.dart';
+import 'package:drip_wallet/features/home/presentation/widgets/expense_transaction_modal.dart';
+import 'package:drip_wallet/features/home/presentation/widgets/income_transaction_modal.dart';
 import 'package:drip_wallet/features/home/presentation/widgets/edit_transaction_modal.dart';
+import 'package:drip_wallet/features/home/presentation/widgets/edit_income_transaction_modal.dart';
+import 'package:drip_wallet/features/home/presentation/widgets/edit_expense_transaction_modal.dart';
+import 'package:drip_wallet/features/home/presentation/pages/recurring_expenses_screen.dart';
+import 'package:drip_wallet/features/home/presentation/pages/recurring_income_screen.dart';
+import 'package:drip_wallet/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -120,6 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             _buildBalanceCard(context, dashboard),
                             const SizedBox(height: 32),
+                            _buildRecurringTransactionsSection(context),
+                            const SizedBox(height: 32),
                             _buildRecentTransactionsHeader(),
                             const SizedBox(height: 16),
                             _buildTransactionsList(dashboard),
@@ -149,22 +157,47 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.blue.shade500,
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-            ),
-            builder: (context) => const NewExpenseModal(),
-          );
-        },
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            backgroundColor: Colors.green.shade400,
+            heroTag: 'income_btn',
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                builder: (context) => const IncomeTransactionModal(),
+              );
+            },
+            child: const Icon(Icons.trending_up, color: Colors.white, size: 24),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            backgroundColor: Colors.red.shade400,
+            heroTag: 'expense_btn',
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                builder: (context) => const ExpenseTransactionModal(),
+              );
+            },
+            child: const Icon(Icons.trending_down, color: Colors.white, size: 24),
+          ),
+        ],
       ),
     );
   }
@@ -406,6 +439,163 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildRecurringTransactionsSection(BuildContext context) {
+    final user = supabase.Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: getIt<FinanceRemoteDataSource>().getRecurringTransactionsForMonth(
+        user.id,
+        _selectedMonth,
+      ),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        final recurringList = snapshot.data ?? [];
+        
+        double expenseTotal = 0.0;
+        double incomeTotal = 0.0;
+
+        for (var item in recurringList) {
+          final amount = (item['amount'] as num).toDouble();
+          if (item['type'] == 'expense') {
+            expenseTotal += amount;
+          } else {
+            incomeTotal += amount;
+          }
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Transacciones Regulares',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                // Gastos Fijos
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => RecurringExpensesScreen(
+                            selectedMonth: _selectedMonth,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.trending_down,
+                                color: Theme.of(context).colorScheme.error,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Gastos Fijos',
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '\$${expenseTotal.toStringAsFixed(2)}',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Ingresos Fijos
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => RecurringIncomeScreen(
+                            selectedMonth: _selectedMonth,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.trending_up,
+                                color: Theme.of(context).colorScheme.secondary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Ingresos Fijos',
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '\$${incomeTotal.toStringAsFixed(2)}',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildRecentTransactionsHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -431,6 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+
 
   void _showTransactionOptions(BuildContext context, TransactionEntity transaction) {
     showModalBottomSheet(
@@ -472,7 +663,13 @@ class _HomeScreenState extends State<HomeScreen> {
           topRight: Radius.circular(20),
         ),
       ),
-      builder: (context) => EditTransactionModal(transaction: transaction),
+      builder: (context) {
+        if (transaction.type == 'income') {
+          return EditIncomeTransactionModal(transaction: transaction);
+        } else {
+          return EditExpenseTransactionModal(transaction: transaction);
+        }
+      },
     );
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:drip_ui/drip_ui.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
+import 'package:drip_wallet/features/home/presentation/widgets/reusable_form_components.dart';
 import 'package:drip_wallet/injection_container.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -17,6 +19,7 @@ class EditTransactionModal extends StatefulWidget {
 }
 
 class _EditTransactionModalState extends State<EditTransactionModal> {
+  late DripFormController _formController;
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
   late double _amount;
@@ -24,13 +27,13 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
   late DateTime _selectedDate;
   late String _selectedType;
 
-  // Categorías cargadas dinámicamente desde la BD
   List<Map<String, dynamic>> _expenseCategories = [];
   List<Map<String, dynamic>> _incomeCategories = [];
 
   @override
   void initState() {
     super.initState();
+    _formController = DripFormController();
     _amount = widget.transaction.amount;
     _selectedDate = widget.transaction.date;
     _selectedType = widget.transaction.type;
@@ -47,32 +50,18 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
   Future<void> _loadCategories() async {
     try {
       final supabaseClient = getIt<SupabaseClient>();
-      print('DEBUG: Iniciando carga de categorías (edit modal)...');
       
-      // Primero: Ver TODOS los registros sin filtro
-      final allCategories = await supabaseClient
-          .from('categories')
-          .select('*');
-      print('DEBUG: Total de categorías sin filtro: ${(allCategories as List).length}');
-      print('DEBUG: Datos completos: $allCategories');
-      
-      // Cargar gastos
       final expenseResponse = await supabaseClient
           .from('categories')
           .select('id, name, icon, type')
           .eq('type', 'expense')
           .order('name');
-      print('DEBUG: Gastos cargados: ${(expenseResponse as List).length} items');
-      print('DEBUG: Datos de gastos: $expenseResponse');
       
-      // Cargar ingresos
       final incomeResponse = await supabaseClient
           .from('categories')
           .select('id, name, icon, type')
           .eq('type', 'income')
           .order('name');
-      print('DEBUG: Ingresos cargados: ${(incomeResponse as List).length} items');
-      print('DEBUG: Datos de ingresos: $incomeResponse');
       
       if (mounted) {
         setState(() {
@@ -90,23 +79,16 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
               })
               .toList();
           
-          print('DEBUG: Categorías procesadas - Expense: ${_expenseCategories.length}, Income: ${_incomeCategories.length}');
-          
-          // Validar que la categoría cargada exista en la lista, si no, usar la primera
           final validCategories = _selectedType == 'income' ? _incomeCategories : _expenseCategories;
           final validCategoryNames = validCategories.map((c) => c['name'] as String).toList();
           
-          print('DEBUG: Validando categoría "${_selectedCategory}" en lista: $validCategoryNames');
-          
           if (!validCategoryNames.contains(_selectedCategory) && validCategories.isNotEmpty) {
-            print('DEBUG: Categoría no encontrada, usando primera: ${validCategories[0]['name']}');
             _selectedCategory = validCategories[0]['name'] as String;
           }
         });
       }
-    } catch (e, stackTrace) {
-      print('ERROR CRÍTICO cargando categorías: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
+      print('ERROR cargando categorías: $e');
     }
   }
 
@@ -146,6 +128,7 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
 
   @override
   void dispose() {
+    _formController.dispose();
     _amountController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -202,168 +185,116 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isIncome = _selectedType == 'income';
+    final titleText = 'Editar ${isIncome ? 'Ingreso' : 'Gasto'}';
+    final categories = isIncome ? _incomeCategories : _expenseCategories;
+
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        left: 16,
-        right: 16,
-        top: 16,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
       ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Editar Transacción',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            // Header
+            ModalHeader(
+              title: titleText,
+              theme: theme,
+              onClose: () => Navigator.pop(context),
             ),
-            const SizedBox(height: 24),
-            // Monto
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Monto',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Descripción
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                labelText: 'Descripción',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Tipo de transacción
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _selectedType == 'expense' 
-                        ? Colors.red 
-                        : Colors.grey.shade300,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _selectedType = 'expense';
-                        if (_expenseCategories.isNotEmpty) {
-                          _selectedCategory = _expenseCategories[0]['name'] as String;
-                        }
-                      });
-                    },
-                    child: Text(
-                      'Gasto',
-                      style: TextStyle(
-                        color: _selectedType == 'expense' 
-                          ? Colors.white 
-                          : Colors.black,
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Transaction Type Selection
+                  Row(
+                    children: [
+                      TransactionTypeButton(
+                        type: 'expense',
+                        selectedType: _selectedType,
+                        label: 'Gasto',
+                        onTap: () {
+                          setState(() {
+                            _selectedType = 'expense';
+                            if (_expenseCategories.isNotEmpty) {
+                              _selectedCategory = _expenseCategories[0]['name'] as String;
+                            }
+                          });
+                        },
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      TransactionTypeButton(
+                        type: 'income',
+                        selectedType: _selectedType,
+                        label: 'Ingreso',
+                        onTap: () {
+                          setState(() {
+                            _selectedType = 'income';
+                            if (_incomeCategories.isNotEmpty) {
+                              _selectedCategory = _incomeCategories[0]['name'] as String;
+                            }
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _selectedType == 'income' 
-                        ? Colors.green 
-                        : Colors.grey.shade300,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _selectedType = 'income';
-                        if (_incomeCategories.isNotEmpty) {
-                          _selectedCategory = _incomeCategories[0]['name'] as String;
-                        }
-                      });
-                    },
-                    child: Text(
-                      'Ingreso',
-                      style: TextStyle(
-                        color: _selectedType == 'income' 
-                          ? Colors.white 
-                          : Colors.black,
-                      ),
-                    ),
+                  const SizedBox(height: 24),
+
+                  // Amount Input
+                  AmountInput(
+                    controller: _amountController,
+                    theme: theme,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Categorías
-            SizedBox(
-              height: 60,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _selectedType == 'income'
-                    ? _incomeCategories.length
-                    : _expenseCategories.length,
-                itemBuilder: (context, index) {
-                  final categories = _selectedType == 'income'
-                      ? _incomeCategories
-                      : _expenseCategories;
-                  final category = categories[index];
-                  final isSelected = _selectedCategory == category['name'];
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedCategory = category['name']),
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: isSelected ? Colors.blue : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              category['icon'],
-                              color: isSelected ? Colors.white : Colors.black,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            category['name'],
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isSelected ? Colors.blue : Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Fecha
-            ListTile(
-              title: const Text('Fecha'),
-              subtitle: Text(_selectedDate.toString().split(' ')[0]),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _selectDate,
-            ),
-            const SizedBox(height: 24),
-            // Botón Guardar
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0066FF),
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              onPressed: _submitForm,
-              child: const Text(
-                'Guardar Cambios',
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                  const SizedBox(height: 40),
+
+                  // Description
+                  FormSectionLabel(label: 'Descripción', theme: theme),
+                  const SizedBox(height: 12),
+                  DescriptionField(
+                    controller: _descriptionController,
+                    hintText: 'Describe la transacción',
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Category Selection
+                  FormSectionLabel(label: 'Categoría', theme: theme),
+                  const SizedBox(height: 16),
+                  CategoryGrid(
+                    categories: categories,
+                    selectedCategory: _selectedCategory,
+                    transactionType: _selectedType,
+                    onCategorySelected: (category) {
+                      setState(() => _selectedCategory = category);
+                    },
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Date Selection
+                  FormSectionLabel(label: 'Fecha', theme: theme),
+                  const SizedBox(height: 12),
+                  DateSelector(
+                    selectedDate: _selectedDate,
+                    onTap: _selectDate,
+                    theme: theme,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Save Button
+                  StyledSaveButton(
+                    label: 'Guardar Cambios',
+                    onPressed: _submitForm,
+                    transactionType: _selectedType,
+                    theme: theme,
+                  ),
+                ],
               ),
             ),
           ],
@@ -372,4 +303,3 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
     );
   }
 }
-
