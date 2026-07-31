@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:drip_wallet/features/finance/data/models/dashboard_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -37,6 +39,18 @@ abstract class FinanceRemoteDataSource {
     String profileId,
     DateTime monthYear,
   );
+
+  /// Crea un grupo familiar para compartir presupuesto
+  Future<Map<String, dynamic>> createBudgetFamily(String profileId);
+
+  /// Se une a un grupo familiar usando un código de invitación
+  Future<Map<String, dynamic>> joinBudgetFamily(
+    String profileId,
+    String inviteCode,
+  );
+
+  /// Obtiene el grupo familiar asociado a un perfil
+  Future<Map<String, dynamic>?> getBudgetFamilyForProfile(String profileId);
 
   /// Elimina (soft delete) una transacción
   Future<void> deleteTransaction(String transactionId);
@@ -109,24 +123,119 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   FinanceRemoteDataSourceImpl(this.supabaseClient);
 
+  String _generateInviteCode() {
+    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final random = Random();
+    return List.generate(
+      6,
+      (_) => characters[random.nextInt(characters.length)],
+    ).join();
+  }
+
+  Future<String?> _getBudgetFamilyIdForProfile(String profileId) async {
+    final membership = await supabaseClient
+        .from('budget_family_members')
+        .select('family_id')
+        .eq('profile_id', profileId)
+        .maybeSingle();
+
+    return membership?['family_id'] as String?;
+  }
+
+  Future<List<String>> _getBudgetScopeProfileIds(String profileId) async {
+    final familyId = await _getBudgetFamilyIdForProfile(profileId);
+    if (familyId == null) return [profileId];
+
+    final members = await supabaseClient
+        .from('budget_family_members')
+        .select('profile_id')
+        .eq('family_id', familyId);
+
+    return (members as List)
+        .map((member) => member['profile_id'] as String)
+        .toList();
+  }
+
+  Future<Map<String, dynamic>?> _getBudgetFamilyByInviteCode(String inviteCode) async {
+    final response = await supabaseClient.rpc(
+      'get_budget_family_by_invite_code',
+      params: {'invite_code': inviteCode.trim()},
+    );
+
+    if (response is List && response.isNotEmpty) {
+      return Map<String, dynamic>.from(response.first as Map);
+    }
+
+    if (response is Map<String, dynamic>) {
+      return response;
+    }
+
+    return null;
+  }
+
+  Future<void> _ensureCurrentMonthFamilyBudget(
+    String familyId,
+    String profileId,
+  ) async {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month, 1);
+    final nextMonth = DateTime(now.year, now.month + 1, 1);
+
+    final existingFamilyBudget = await supabaseClient
+        .from('monthly_budgets')
+        .select('id')
+        .eq('family_id', familyId)
+        .gte('month_year', currentMonth.toIso8601String())
+        .lt('month_year', nextMonth.toIso8601String())
+        .maybeSingle();
+
+    if (existingFamilyBudget != null) return;
+
+    final personalBudget = await supabaseClient
+        .from('monthly_budgets')
+        .select('budget_limit, monthly_income')
+        .eq('profile_id', profileId)
+        .gte('month_year', currentMonth.toIso8601String())
+        .lt('month_year', nextMonth.toIso8601String())
+        .maybeSingle();
+
+    final budgetLimit = (personalBudget?['budget_limit'] as num?)?.toDouble() ?? 0.0;
+    final monthlyIncome = (personalBudget?['monthly_income'] as num?)?.toDouble();
+
+    await supabaseClient.from('monthly_budgets').insert({
+      'family_id': familyId,
+      'profile_id': profileId,
+      'month_year': currentMonth.toIso8601String(),
+      'budget_limit': budgetLimit,
+      if (monthlyIncome != null) 'monthly_income': monthlyIncome,
+    });
+  }
+
   @override
   Future<DashboardModel> fetchDashboardData(String profileId) async {
     try {
       // Cargar categorías desde BD si no están cacheadas
       await _loadCategories();
       
+      final budgetFamilyId = await _getBudgetFamilyIdForProfile(profileId);
+      final scopeProfileIds = await _getBudgetScopeProfileIds(profileId);
+      
       final now = DateTime.now();
       final currentMonth = DateTime(now.year, now.month, 1);
       final nextMonth = DateTime(now.year, now.month + 1, 1);
 
       // 1. Obtener presupuesto del mes actual
-      final budgetResponse = await supabaseClient
-          .from('monthly_budgets')
-          .select('id, budget_limit')
-          .eq('profile_id', profileId)
-          .gte('month_year', currentMonth.toIso8601String())
-          .lt('month_year', nextMonth.toIso8601String())
-          .maybeSingle();
+      var budgetQuery = supabaseClient
+        .from('monthly_budgets')
+        .select('id, budget_limit')
+        .gte('month_year', currentMonth.toIso8601String())
+        .lt('month_year', nextMonth.toIso8601String());
+
+      budgetQuery = budgetFamilyId != null
+        ? budgetQuery.eq('family_id', budgetFamilyId)
+        : budgetQuery.eq('profile_id', profileId);
+
+      final budgetResponse = await budgetQuery.maybeSingle();
 
       final budgetLimit = (budgetResponse?['budget_limit'] as num?)?.toDouble() ?? 0.0;
 
@@ -139,7 +248,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final allExpensesResponse = await supabaseClient
           .from('expenses')
           .select('id, amount, description, type, created_at, category_id, profile_id, is_deleted')
-          .eq('profile_id', profileId)
+          .inFilter('profile_id', scopeProfileIds)
           .neq('is_deleted', true)
           .gte('created_at', currentMonth.toIso8601String())
           .lt('created_at', nextMonth.toIso8601String())
@@ -223,17 +332,24 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       // Cargar categorías desde BD si no están cacheadas
       await _loadCategories();
       
+      final budgetFamilyId = await _getBudgetFamilyIdForProfile(profileId);
+      final scopeProfileIds = await _getBudgetScopeProfileIds(profileId);
+      
       final startOfMonth = DateTime(month.year, month.month, 1);
       final endOfMonth = DateTime(month.year, month.month + 1, 1);
 
       // 1. Buscar presupuesto para el mes seleccionado
-      var budgetResponse = await supabaseClient
+      var budgetQuery = supabaseClient
           .from('monthly_budgets')
           .select('id, budget_limit')
-          .eq('profile_id', profileId)
           .gte('month_year', startOfMonth.toIso8601String())
-          .lt('month_year', endOfMonth.toIso8601String())
-          .maybeSingle();
+          .lt('month_year', endOfMonth.toIso8601String());
+
+      budgetQuery = budgetFamilyId != null
+          ? budgetQuery.eq('family_id', budgetFamilyId)
+          : budgetQuery.eq('profile_id', profileId);
+
+      var budgetResponse = await budgetQuery.maybeSingle();
 
       // 2. Si no existe presupuesto en este mes, buscar en meses anteriores
       if (budgetResponse == null) {
@@ -243,13 +359,17 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           final startCheck = DateTime(checkMonth.year, checkMonth.month, 1);
           final endCheck = DateTime(checkMonth.year, checkMonth.month + 1, 1);
 
-          budgetResponse = await supabaseClient
-              .from('monthly_budgets')
-              .select('id, budget_limit')
-              .eq('profile_id', profileId)
-              .gte('month_year', startCheck.toIso8601String())
-              .lt('month_year', endCheck.toIso8601String())
-              .maybeSingle();
+          var fallbackQuery = supabaseClient
+            .from('monthly_budgets')
+            .select('id, budget_limit')
+            .gte('month_year', startCheck.toIso8601String())
+            .lt('month_year', endCheck.toIso8601String());
+
+          fallbackQuery = budgetFamilyId != null
+            ? fallbackQuery.eq('family_id', budgetFamilyId)
+            : fallbackQuery.eq('profile_id', profileId);
+
+          budgetResponse = await fallbackQuery.maybeSingle();
 
           if (budgetResponse != null) break;
 
@@ -267,7 +387,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final expensesResponse = await supabaseClient
           .from('expenses')
           .select('id, amount, description, type, created_at, category_id, profile_id, is_deleted')
-          .eq('profile_id', profileId)
+          .inFilter('profile_id', scopeProfileIds)
           .neq('is_deleted', true)
           .gte('created_at', startOfMonth.toIso8601String())
           .lt('created_at', endOfMonth.toIso8601String())
@@ -351,6 +471,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       // Cargar categorías desde BD si no están cacheadas
       await _loadCategories();
       
+      final scopeProfileIds = await _getBudgetScopeProfileIds(profileId);
+      
       final startOfMonth = DateTime(month.year, month.month, 1);
       final endOfMonth = DateTime(month.year, month.month + 1, 1);
 
@@ -358,7 +480,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final expensesResponse = await supabaseClient
           .from('expenses')
           .select('id, amount, description, type, created_at, category_id, profile_id, is_deleted')
-          .eq('profile_id', profileId)
+          .inFilter('profile_id', scopeProfileIds)
           .neq('is_deleted', true)
           .gte('created_at', startOfMonth.toIso8601String())
           .lt('created_at', endOfMonth.toIso8601String())
@@ -395,15 +517,20 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       
       final now = DateTime.now();
       final currentMonth = DateTime(now.year, now.month, 1);
+      final budgetFamilyId = await _getBudgetFamilyIdForProfile(profileId);
 
       // 1. Obtener o crear presupuesto del mes actual
-      var budgetResponse = await supabaseClient
+      var budgetQuery = supabaseClient
           .from('monthly_budgets')
-          .select('id')
-          .eq('profile_id', profileId)
+        .select('id')
           .gte('month_year', currentMonth.toIso8601String())
-          .lt('month_year', DateTime(now.year, now.month + 1, 1).toIso8601String())
-          .maybeSingle();
+        .lt('month_year', DateTime(now.year, now.month + 1, 1).toIso8601String());
+
+      budgetQuery = budgetFamilyId != null
+        ? budgetQuery.eq('family_id', budgetFamilyId)
+        : budgetQuery.eq('profile_id', profileId);
+
+      var budgetResponse = await budgetQuery.maybeSingle();
 
       String budgetId = budgetResponse?['id'] as String? ?? '';
 
@@ -415,6 +542,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
               'month_year': currentMonth.toIso8601String(),
               'budget_limit': data['budget_limit'] ?? 5000.0,
               'profile_id': profileId,
+              if (budgetFamilyId != null) 'family_id': budgetFamilyId,
             })
             .select('id')
             .single();
@@ -553,15 +681,20 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     try {
       final startOfMonth = DateTime(monthYear.year, monthYear.month, 1);
       final endOfMonth = DateTime(monthYear.year, monthYear.month + 1, 1);
+      final budgetFamilyId = await _getBudgetFamilyIdForProfile(profileId);
 
       // Obtener presupuesto existente
-      var existing = await supabaseClient
+      var existingQuery = supabaseClient
           .from('monthly_budgets')
           .select('id')
-          .eq('profile_id', profileId)
           .gte('month_year', startOfMonth.toIso8601String())
-          .lt('month_year', endOfMonth.toIso8601String())
-          .maybeSingle();
+          .lt('month_year', endOfMonth.toIso8601String());
+
+      existingQuery = budgetFamilyId != null
+          ? existingQuery.eq('family_id', budgetFamilyId)
+          : existingQuery.eq('profile_id', profileId);
+
+      var existing = await existingQuery.maybeSingle();
 
       if (existing != null) {
         // Actualizar usando UPSERT
@@ -572,6 +705,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             .upsert({
               'id': budgetId,
               'profile_id': profileId,
+              if (budgetFamilyId != null) 'family_id': budgetFamilyId,
               'month_year': startOfMonth.toIso8601String(),
               'budget_limit': budgetLimit,
             })
@@ -585,6 +719,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             .from('monthly_budgets')
             .insert({
               'profile_id': profileId,
+              if (budgetFamilyId != null) 'family_id': budgetFamilyId,
               'month_year': startOfMonth.toIso8601String(),
               'budget_limit': budgetLimit,
             })
@@ -605,14 +740,19 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     try {
       final startOfMonth = DateTime(monthYear.year, monthYear.month, 1);
       final endOfMonth = DateTime(monthYear.year, monthYear.month + 1, 1);
+      final budgetFamilyId = await _getBudgetFamilyIdForProfile(profileId);
 
-      final budget = await supabaseClient
+      var budgetQuery = supabaseClient
           .from('monthly_budgets')
           .select('id, monthly_income, budget_limit, month_year')
-          .eq('profile_id', profileId)
           .gte('month_year', startOfMonth.toIso8601String())
-          .lt('month_year', endOfMonth.toIso8601String())
-          .maybeSingle();
+          .lt('month_year', endOfMonth.toIso8601String());
+
+      budgetQuery = budgetFamilyId != null
+          ? budgetQuery.eq('family_id', budgetFamilyId)
+          : budgetQuery.eq('profile_id', profileId);
+
+      final budget = await budgetQuery.maybeSingle();
 
       return budget;
     } catch (e) {
@@ -695,6 +835,77 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     return allRecurring.where((r) => r['type'] == 'expense').toList();
   }
 
+  @override
+  Future<Map<String, dynamic>> createBudgetFamily(String profileId) async {
+    final existingFamilyId = await _getBudgetFamilyIdForProfile(profileId);
+    if (existingFamilyId != null) {
+      final existingFamily = await supabaseClient
+          .from('budget_families')
+          .select('id, invite_code, created_by, created_at')
+          .eq('id', existingFamilyId)
+          .maybeSingle();
+      if (existingFamily != null) return existingFamily;
+    }
+
+    final inviteCode = _generateInviteCode();
+    final family = await supabaseClient
+        .from('budget_families')
+        .insert({
+          'invite_code': inviteCode,
+          'created_by': profileId,
+        })
+        .select('id, invite_code, created_by, created_at')
+        .single();
+
+    await supabaseClient.from('budget_family_members').insert({
+      'family_id': family['id'],
+      'profile_id': profileId,
+      'role': 'owner',
+    });
+
+    await _ensureCurrentMonthFamilyBudget(family['id'] as String, profileId);
+
+    return family;
+  }
+
+  @override
+  Future<Map<String, dynamic>> joinBudgetFamily(
+    String profileId,
+    String inviteCode,
+  ) async {
+    final family = await _getBudgetFamilyByInviteCode(inviteCode);
+    if (family == null) {
+      throw Exception('No se encontró un presupuesto familiar con ese código');
+    }
+
+    final currentFamilyId = await _getBudgetFamilyIdForProfile(profileId);
+    if (currentFamilyId != null && currentFamilyId != family['id']) {
+      throw Exception('El usuario ya pertenece a otro presupuesto familiar');
+    }
+
+    await supabaseClient.from('budget_family_members').upsert({
+      'family_id': family['id'],
+      'profile_id': profileId,
+      'role': 'member',
+    });
+
+    await _ensureCurrentMonthFamilyBudget(family['id'] as String, profileId);
+
+    return family;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getBudgetFamilyForProfile(String profileId) async {
+    final familyId = await _getBudgetFamilyIdForProfile(profileId);
+    if (familyId == null) return null;
+
+    return supabaseClient
+        .from('budget_families')
+        .select('id, invite_code, created_by, created_at')
+        .eq('id', familyId)
+        .maybeSingle();
+  }
+
   /// Crear transacción recurrente genérica (income o expense)
   @override
   Future<Map<String, dynamic>> addRecurringTransaction(
@@ -719,7 +930,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           .single();
 
       print('DEBUG: Transacción recurrente creada: ${response['description']} (${response['type']})');
-      return response as Map<String, dynamic>;
+      return response;
     } catch (e) {
       print('Error creando transacción recurrente: $e');
       throw Exception('Error al crear transacción recurrente: $e');
@@ -731,11 +942,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   Future<List<Map<String, dynamic>>> getRecurringTransactions(String profileId) async {
     try {
       await _loadCategories();
+      final scopeProfileIds = await _getBudgetScopeProfileIds(profileId);
 
       final response = await supabaseClient
           .from('recurring_transactions')
           .select('id, description, amount, category_id, type, start_date, end_date')
-          .eq('profile_id', profileId)
+          .inFilter('profile_id', scopeProfileIds)
           .gte('start_date', DateTime.now().toIso8601String().split('T')[0])
           .order('description');
 
@@ -797,6 +1009,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   ) async {
     try {
       await _loadCategories();
+      final scopeProfileIds = await _getBudgetScopeProfileIds(profileId);
 
       final startOfMonth = DateTime(month.year, month.month, 1).toIso8601String().split('T')[0];
       final endOfMonth = DateTime(month.year, month.month + 1, 1).toIso8601String().split('T')[0];
@@ -804,7 +1017,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final response = await supabaseClient
           .from('recurring_transactions')
           .select('id, description, amount, category_id, type, start_date, end_date')
-          .eq('profile_id', profileId)
+          .inFilter('profile_id', scopeProfileIds)
           .lte('start_date', endOfMonth)
           .or('end_date.is.null,end_date.gte.$startOfMonth')
           .order('description');

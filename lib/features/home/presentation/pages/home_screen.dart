@@ -48,40 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Builder(
-          builder: (context) {
-            String greeting = 'Hola';
-            final user = supabase.Supabase.instance.client.auth.currentUser;
-            if (user != null) {
-              final fullName = user.userMetadata?['name'] as String? ?? 'Usuario';
-              final firstName = fullName.split(' ').first.toLowerCase();
-              greeting = 'Hola $firstName';
-            }
-            return Text(
-              greeting,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0066FF),
-              ),
-            );
-          },
-        ),
-        centerTitle: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Icon(
-              Icons.notifications_none,
-              color: context.dripTheme.primaryColor,
-              size: 28,
-            ),
-          ),
-        ],
-      ),
+      
       // BlocListener<AuthBloc> escucha cambios de autenticación
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, authState) {
@@ -122,10 +89,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
               if (state is DashboardLoaded) {
                 final dashboard = state.dashboard;
+                final user = supabase.Supabase.instance.client.auth.currentUser;
+                final fullName = user?.userMetadata?['name'] as String? ?? 'Usuario';
+                final firstName = fullName.split(' ').first.toLowerCase();
+                final greeting = user != null ? 'Hola $firstName' : 'Hola';
 
                 return SingleChildScrollView(
                   child: Column(
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              greeting,
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: context.dripTheme.primaryColor,
+                              ),
+                            ),
+                            Icon(
+                              Icons.notifications_none,
+                              color: context.dripTheme.primaryColor,
+                              size: 28,
+                            ),
+                          ],
+                        ),
+                      ),
                       _buildMonthSelector(context),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

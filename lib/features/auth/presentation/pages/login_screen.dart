@@ -16,8 +16,6 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   late DripFormController _controller;
-  bool _obscurePassword = true;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -228,8 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     try {
-      // TODO: Implement Google Sign In logic
-      print('Google Sign In tapped');
+      context.read<AuthBloc>().add(AuthGoogleRequested());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

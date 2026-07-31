@@ -19,4 +19,6 @@ class AuthSignUpRequested extends AuthEvent {
   });
 }
 
+class AuthGoogleRequested extends AuthEvent {}
+
 class AuthSignOutRequested extends AuthEvent {}

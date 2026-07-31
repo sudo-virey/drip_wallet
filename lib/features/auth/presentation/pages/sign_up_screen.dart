@@ -294,7 +294,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _handleGoogleSignUp() async {
     try {
-      // TODO: Implement Google Sign Up logic
+      context.read<AuthBloc>().add(AuthGoogleRequested());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,6 +1,7 @@
 // lib/features/history/presentation/pages/history_screen.dart
 import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
 import 'package:drip_wallet/core/utils/icon_converter.dart';
+import 'package:drip_wallet/core/services/report_service.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
@@ -19,6 +20,7 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedCategory = 'Todas las Categorías';
   String _selectedDateFilter = 'Este Mes';
+  late final ReportService _reportService;
 
   // Cargar categorías dinámicamente desde la BD
   List<Map<String, dynamic>> _categories = [];
@@ -34,6 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+    _reportService = ReportService();
     _loadCategories();
     
     // Cargar transacciones del mes actual para History
@@ -277,7 +280,79 @@ class _HistoryScreenState extends State<HistoryScreen> {
           );
         },
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _generateAndShareReport,
+        icon: const Icon(Icons.download),
+        label: const Text('Descargar Reporte'),
+      ),
     );
+  }
+
+  Future<void> _generateAndShareReport() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) return;
+
+    final now = DateTime.now();
+    final financeState = context.read<FinanceBloc>().state;
+
+    if (financeState is! HistoryLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cargando datos...')),
+      );
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generando reporte...')),
+      );
+
+      // Separar transacciones en ingresos y gastos
+      final transactions = financeState.transactions;
+      final incomes = transactions.where((t) => t.type == 'income').toList();
+      final expenses = transactions.where((t) => t.type == 'expense').toList();
+
+      // Para este ejemplo, consideramos todos los expenses como variables
+      // En una implementación real, se diferenciarían por categoría o tabla
+      final variableExpenses = expenses
+          .map((tx) => {
+                'title': tx.title,
+                'amount': tx.amount,
+                'category': tx.category,
+              })
+          .toList();
+
+      final totalIncome = incomes.fold<double>(0, (sum, tx) => sum + tx.amount);
+      final totalVariableExpenses = expenses.fold<double>(0, (sum, tx) => sum + tx.amount);
+
+      // Obtener presupuesto del mes actual (necesitaría venir del dashboard)
+      // Por ahora usamos 0 como placeholder
+      const budgetLimit = 0.0;
+
+      final file = await _reportService.generateAccountStatement(
+        month: now,
+        budgetLimit: budgetLimit,
+        totalIncome: totalIncome,
+        totalFixedExpenses: 0, // No hay gastos fijos en este flujo aún
+        totalVariableExpenses: totalVariableExpenses,
+        fixedExpenses: [],
+        variableExpenses: variableExpenses,
+      );
+
+      await _reportService.shareReport(file);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reporte generado exitosamente')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar reporte: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildFilters() {
