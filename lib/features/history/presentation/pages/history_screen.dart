@@ -14,18 +14,18 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String _selectedCategory = 'All Categories';
-  String _selectedDateFilter = 'This Month';
+  String _selectedCategory = 'Todas las Categorías';
+  String _selectedDateFilter = 'Este Mes';
 
   final List<String> _categories = [
-    'All Categories',
-    'Food',
-    'Transit',
-    'Bills',
-    'Shop',
-    'Home',
-    'Fun',
-    'Other',
+    'Todas las Categorías',
+    'Comida',
+    'Transporte',
+    'Facturas',
+    'Compras',
+    'Casa',
+    'Diversión',
+    'Otro',
   ];
 
   @override
@@ -45,7 +45,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Family Budget',
+          'Presupuesto Familiar',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,

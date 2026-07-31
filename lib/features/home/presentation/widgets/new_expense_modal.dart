@@ -14,6 +14,8 @@ class NewExpenseModal extends StatefulWidget {
 
 class _NewExpenseModalState extends State<NewExpenseModal> {
   late DripFormController _formController;
+  late TextEditingController _amountController;
+  late TextEditingController _descriptionController;
   double _amount = 0.0;
   String _selectedCategory = 'Food';
   DateTime _selectedDate = DateTime.now();
@@ -32,12 +34,24 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
   void initState() {
     super.initState();
     _formController = DripFormController();
+    _amountController = TextEditingController();
+    _descriptionController = TextEditingController();
+    _amountController.addListener(_updateAmount);
   }
 
   @override
   void dispose() {
     _formController.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
     super.dispose();
+  }
+
+  /// Actualizar _amount cuando el usuario escribe en el TextField
+  void _updateAmount() {
+    setState(() {
+      _amount = double.tryParse(_amountController.text) ?? 0.0;
+    });
   }
 
   @override
@@ -93,7 +107,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                     child: Column(
                       children: [
                         Text(
-                          'AMOUNT',
+                          'MONTO',
                           style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.grey,
                                 letterSpacing: 1,
@@ -112,6 +126,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                             SizedBox(
                               width: 150,
                               child: TextField(
+                                controller: _amountController,
                                 textAlign: TextAlign.center,
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
@@ -129,11 +144,6 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                                 keyboardType: const TextInputType.numberWithOptions(
                                   decimal: true,
                                 ),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _amount = double.tryParse(value) ?? 0.0;
-                                  });
-                                },
                               ),
                             ),
                             Column(
@@ -171,7 +181,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
 
                   // Category Selection
                   Text(
-                    'Category',
+                    'Categoría',
                     style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -231,12 +241,16 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                   const SizedBox(height: 24),
 
                   // Description Field
-                  DripTextField(
-                    id: 'description',
-                    controller: _formController,
-                    hintText: 'e.g., Weekly groceries',
-                    label: 'Description',
-                    prefixIcon: Icons.description_outlined,
+                  TextField(
+                    controller: _descriptionController,
+                    decoration: InputDecoration(
+                      hintText: 'p.ej., Compras de la semana',
+                      labelText: 'Descripción',
+                      prefixIcon: const Icon(Icons.description_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
 
@@ -266,7 +280,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Date',
+                                'Fecha',
                                 style: theme.textTheme.labelSmall?.copyWith(
                                       color: Colors.grey,
                                     ),
@@ -274,8 +288,8 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                               const SizedBox(height: 8),
                               Text(
                                 _selectedDate.day == DateTime.now().day
-                                    ? 'Today'
-                                    : '${_selectedDate.month}/${_selectedDate.day}/${_selectedDate.year}',
+                                    ? 'Hoy'
+                                    : '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
                                 style: theme.textTheme.titleSmall?.copyWith(
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -317,7 +331,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
     if (_amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a valid amount'),
+          content: Text('Por favor ingresa un monto válido'),
           backgroundColor: Colors.red,
         ),
       );
@@ -343,7 +357,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
       'amount': _amount,
       'type': 'expense',
       'date': _selectedDate,
-      'description': '', // TODO: Obtener descripción del campo
+      'description': _descriptionController.text,
     };
 
     // Disparar evento AddTransaction

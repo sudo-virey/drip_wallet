@@ -205,12 +205,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Account'),
-        _buildMenuOption('Personal Information', Icons.person_outline),
+        _buildSectionTitle('Cuenta'),
+        _buildMenuOption('Información Personal', Icons.person_outline),
         const SizedBox(height: 12),
-        _buildMenuOption('Security', Icons.shield_outlined),
+        _buildMenuOption('Seguridad', Icons.shield_outlined),
         const SizedBox(height: 12),
-        _buildMenuOption('Linked Bank Accounts', Icons.account_balance_outlined),
+        _buildMenuOption('Cuentas Bancarias Vinculadas', Icons.account_balance_outlined),
       ],
     );
   }
@@ -219,12 +219,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Family'),
-        _buildMenuOption('Family Members', Icons.people_outline),
+        _buildSectionTitle('Familia'),
+        _buildMenuOption('Miembros de la Familia', Icons.people_outline),
         const SizedBox(height: 12),
         _buildInviteButton(),
         const SizedBox(height: 12),
-        _buildMenuOption('Budget Limits', Icons.trending_up_outlined),
+        _buildMenuOption('Límites de Presupuesto', Icons.trending_up_outlined),
       ],
     );
   }
@@ -233,9 +233,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('App Settings'),
+        _buildSectionTitle('Configuración de la Aplicación'),
         _buildToggleOption(
-          'Notifications',
+          'Notificaciones',
           Icons.notifications_outlined,
           _notificationsEnabled,
           (value) {
@@ -244,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 12),
         _buildToggleOption(
-          'Light Mode',
+          'Modo Claro',
           Icons.light_mode_outlined,
           _lightModeEnabled,
           (value) {
@@ -252,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
         const SizedBox(height: 12),
-        _buildMenuOption('Currency', Icons.attach_money_outlined, showValue: 'USD (\$)'),
+        _buildMenuOption('Moneda', Icons.attach_money_outlined, showValue: 'USD (\\\$)'),
       ],
     );
   }
@@ -261,10 +261,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Support'),
-        _buildMenuOption('Help Center', Icons.help_outline),
+        _buildSectionTitle('Soporte'),
+        _buildMenuOption('Centro de Ayuda', Icons.help_outline),
         const SizedBox(height: 12),
-        _buildMenuOption('Privacy Policy', Icons.privacy_tip_outlined),
+        _buildMenuOption('Política de Privacidad', Icons.privacy_tip_outlined),
       ],
     );
   }
@@ -364,7 +364,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(Icons.person_add_outlined, color: context.dripPrimary, size: 18),
             const SizedBox(width: 8),
             Text(
-              'Invite to Family',
+              'Invitar a la Familia',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -385,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onPressed: () {
           _showLogoutDialog();
         },
-        label: 'Log out',
+        label: 'Cerrar Sesión',
       ),
     );
   }
@@ -395,19 +395,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Log Out'),
-          content: const Text('Are you sure you want to log out?'),
+          title: const Text('Cerrar Sesión'),
+          content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
+              child: const Text('Cancelar'),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
                 context.read<AuthBloc>().add(AuthSignOutRequested());
               },
-              child: const Text('Log Out'),
+              child: const Text('Cerrar Sesión'),
             ),
           ],
         );
