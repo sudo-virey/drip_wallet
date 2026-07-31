@@ -138,7 +138,7 @@ class DashboardDataSourceImpl implements DashboardDataSource {
         recentTransactions: recentTransactions,
       );
     } catch (e) {
-      print('Error fetching dashboard data: $e');
+      // Silenciar error en producción
       return DashboardModel(
         totalIncome: 0,
         totalExpense: 0,

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:drip_wallet/features/finance/data/models/dashboard_model.dart';
+import 'package:drip_wallet/features/finance/data/models/transaction_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 abstract class FinanceRemoteDataSource {
