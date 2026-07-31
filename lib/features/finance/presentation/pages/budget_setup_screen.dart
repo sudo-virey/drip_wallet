@@ -100,16 +100,16 @@ class _BudgetSetupScreenState extends State<BudgetSetupScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Configurar Presupuesto',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
@@ -199,7 +199,7 @@ class _BudgetSetupScreenState extends State<BudgetSetupScreen> {
               child: Text(
                 'Este mes ya pasó',
                 style: TextStyle(
-                  color: Colors.orange.shade700,
+                  color: Theme.of(context).colorScheme.tertiary,
                   fontSize: 12,
                 ),
               ),
@@ -222,19 +222,19 @@ class _BudgetSetupScreenState extends State<BudgetSetupScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        border: Border.all(color: Colors.orange),
+        color: Theme.of(context).colorScheme.tertiaryContainer,
+        border: Border.all(color: Theme.of(context).colorScheme.tertiary),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber, color: Colors.orange.shade700),
+          Icon(Icons.warning_amber, color: Theme.of(context).colorScheme.tertiary),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'No se pueden editar presupuestos de meses pasados',
               style: TextStyle(
-                color: Colors.orange.shade700,
+                color: Theme.of(context).colorScheme.onTertiaryContainer,
                 fontSize: 14,
               ),
             ),

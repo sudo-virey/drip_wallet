@@ -23,6 +23,8 @@ class TransactionTypeButton extends StatelessWidget {
     final theme = Theme.of(context);
     final expenseColor = theme.colorScheme.error;
     final incomeColor = theme.colorScheme.secondary;
+    final backgroundColor = theme.colorScheme.surfaceVariant;
+    final foregroundColor = theme.colorScheme.onSurface;
     
     return Expanded(
       child: GestureDetector(
@@ -32,7 +34,7 @@ class TransactionTypeButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected
                 ? (isExpense ? expenseColor : incomeColor)
-                : Colors.grey.shade200,
+                : backgroundColor,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -40,14 +42,14 @@ class TransactionTypeButton extends StatelessWidget {
             children: [
               Icon(
                 isExpense ? Icons.trending_down : Icons.trending_up,
-                color: isSelected ? Colors.white : Colors.black,
+                color: isSelected ? Colors.white : foregroundColor,
               ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : Colors.black,
+                  color: isSelected ? Colors.white : foregroundColor,
                 ),
               ),
             ],
@@ -77,7 +79,7 @@ class AmountInput extends StatelessWidget {
           Text(
             'MONTO',
             style: theme.textTheme.labelSmall?.copyWith(
-                  color: Colors.grey,
+                  color: theme.colorScheme.onSurfaceVariant,
                   letterSpacing: 1,
                 ),
           ),
@@ -88,7 +90,7 @@ class AmountInput extends StatelessWidget {
               Text(
                 '\$',
                 style: theme.textTheme.displaySmall?.copyWith(
-                      color: Colors.grey.shade600,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
               ),
               SizedBox(
@@ -101,13 +103,13 @@ class AmountInput extends StatelessWidget {
                     hintText: '0.00',
                     hintStyle: TextStyle(
                       fontSize: 48,
-                      color: Colors.grey.shade400,
+                        color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   style: TextStyle(
                     fontSize: 48,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade600,
+                      color: theme.colorScheme.onSurface,
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -142,6 +144,9 @@ class CategoryGrid extends StatelessWidget {
     final theme = Theme.of(context);
     final expenseColor = theme.colorScheme.error;
     final incomeColor = theme.colorScheme.secondary;
+    final surfaceColor = theme.colorScheme.surfaceContainerHighest;
+    final borderColor = theme.colorScheme.outlineVariant;
+    final textColor = theme.colorScheme.onSurface;
     
     return GridView.builder(
       shrinkWrap: true,
@@ -164,12 +169,12 @@ class CategoryGrid extends StatelessWidget {
             decoration: BoxDecoration(
               color: isSelected
                   ? selectedColor
-                  : Colors.grey.shade100,
+                  : surfaceColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected
                     ? selectedColor
-                    : Colors.grey.shade300,
+                    : borderColor,
                 width: 2,
               ),
             ),
@@ -179,7 +184,7 @@ class CategoryGrid extends StatelessWidget {
                 Icon(
                   stringToIconData(category['icon'] as String? ?? 'category'),
                   size: 28,
-                  color: isSelected ? Colors.white : Colors.grey.shade700,
+                  color: isSelected ? Colors.white : textColor,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -188,7 +193,7 @@ class CategoryGrid extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : Colors.grey.shade700,
+                    color: isSelected ? Colors.white : textColor,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -222,7 +227,8 @@ class DateSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
+          color: theme.colorScheme.surfaceContainerHighest,
+          border: Border.all(color: theme.colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -235,7 +241,7 @@ class DateSelector extends StatelessWidget {
             Icon(
               Icons.calendar_today,
               size: 20,
-              color: Colors.grey.shade600,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -279,7 +285,7 @@ class StyledSaveButton extends StatelessWidget {
         child: Text(
           label,
           style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.white,
+                color: theme.colorScheme.onPrimary,
                 fontWeight: FontWeight.bold,
               ),
         ),
@@ -303,15 +309,12 @@ class DescriptionField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      style: Theme.of(context).textTheme.bodyLarge,
       decoration: InputDecoration(
         hintText: hintText,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
       ),
     );
@@ -369,7 +372,7 @@ class ModalHeader extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: theme.primaryColor,
+                  color: theme.colorScheme.primary,
                   ),
             ),
           ),
@@ -378,7 +381,7 @@ class ModalHeader extends StatelessWidget {
             child: Icon(
               Icons.close,
               size: 28,
-              color: theme.primaryColor,
+              color: theme.colorScheme.primary,
             ),
           ),
         ],
