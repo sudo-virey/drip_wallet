@@ -1,10 +1,10 @@
 import 'package:equatable/equatable.dart';
 
 class DashboardEntity extends Equatable {
-  final double totalIncome;
-  final double totalExpense;
-  final double balance;
-  final double budgetLimit;
+  final double totalIncome;      // Suma de todas las transacciones tipo 'income'
+  final double totalExpense;     // Suma de todas las transacciones tipo 'expense'
+  final double balance;          // totalIncome - totalExpense
+  final double budgetLimit;      // Límite de gasto del mes actual
   final List<TransactionEntity> recentTransactions;
 
   const DashboardEntity({

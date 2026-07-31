@@ -24,6 +24,24 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
+  Future<Either<Failure, DashboardEntity>> fetchDashboardDataForMonth(
+    String profileId,
+    DateTime month,
+  ) async {
+    try {
+      final dashboard = await remoteDataSource.fetchDashboardDataForMonth(
+        profileId,
+        month,
+      );
+      return Right(dashboard);
+    } on Exception catch (e) {
+      return Left(ServerFailure(e.toString()));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, TransactionEntity>> addTransaction(
     String profileId,
     Map<String, dynamic> data,
@@ -36,6 +54,71 @@ class FinanceRepositoryImpl implements FinanceRepository {
       return Right(transaction);
     } on ArgumentError catch (e) {
       return Left(ServerFailure('Invalid data: ${e.message}'));
+    } on Exception catch (e) {
+      return Left(ServerFailure(e.toString()));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> setMonthlyBudget(
+    String profileId,
+    DateTime monthYear,
+    double budgetLimit,
+  ) async {
+    try {
+      await remoteDataSource.setMonthlyBudget(
+        profileId,
+        monthYear,
+        budgetLimit,
+      );
+      return Right(null);
+    } on Exception catch (e) {
+      return Left(ServerFailure(e.toString()));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>?>> getMonthlyBudget(
+    String profileId,
+    DateTime monthYear,
+  ) async {
+    try {
+      final budget = await remoteDataSource.getMonthlyBudget(
+        profileId,
+        monthYear,
+      );
+      return Right(budget);
+    } on Exception catch (e) {
+      return Left(ServerFailure(e.toString()));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteTransaction(String transactionId) async {
+    try {
+      await remoteDataSource.deleteTransaction(transactionId);
+      return Right(null);
+    } on Exception catch (e) {
+      return Left(ServerFailure(e.toString()));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateTransaction(
+    String transactionId,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      await remoteDataSource.updateTransaction(transactionId, data);
+      return Right(null);
     } on Exception catch (e) {
       return Left(ServerFailure(e.toString()));
     } catch (e) {

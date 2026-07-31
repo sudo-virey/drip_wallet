@@ -47,3 +47,23 @@ class FinanceError extends FinanceState {
   @override
   List<Object?> get props => [message];
 }
+
+/// Estado cuando el presupuesto ha sido establecido exitosamente
+class BudgetSet extends FinanceState {
+  final String message;
+
+  const BudgetSet({this.message = 'Presupuesto establecido correctamente'});
+
+  @override
+  List<Object?> get props => [message];
+}
+
+/// Estado cuando se ha obtenido el presupuesto mensual
+class BudgetFetched extends FinanceState {
+  final Map<String, dynamic>? budget;
+
+  const BudgetFetched(this.budget);
+
+  @override
+  List<Object?> get props => [budget];
+}

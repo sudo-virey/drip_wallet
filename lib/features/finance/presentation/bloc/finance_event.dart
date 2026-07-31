@@ -17,6 +17,20 @@ class LoadDashboard extends FinanceEvent {
   List<Object?> get props => [profileId];
 }
 
+/// Evento para cargar el dashboard de un mes específico
+class LoadDashboardForMonth extends FinanceEvent {
+  final String profileId;
+  final DateTime month;
+
+  const LoadDashboardForMonth({
+    required this.profileId,
+    required this.month,
+  });
+
+  @override
+  List<Object?> get props => [profileId, month];
+}
+
 /// Evento para agregar una nueva transacción
 class AddTransaction extends FinanceEvent {
   final String profileId;
@@ -39,4 +53,64 @@ class RefreshDashboard extends FinanceEvent {
 
   @override
   List<Object?> get props => [profileId];
+}
+
+/// Evento para establecer el límite de presupuesto mensual
+class SetMonthlyBudget extends FinanceEvent {
+  final String profileId;
+  final DateTime monthYear;
+  final double budgetLimit;
+
+  const SetMonthlyBudget({
+    required this.profileId,
+    required this.monthYear,
+    required this.budgetLimit,
+  });
+
+  @override
+  List<Object?> get props => [profileId, monthYear, budgetLimit];
+}
+
+/// Evento para obtener el presupuesto de un mes
+class FetchMonthlyBudget extends FinanceEvent {
+  final String profileId;
+  final DateTime monthYear;
+
+  const FetchMonthlyBudget({
+    required this.profileId,
+    required this.monthYear,
+  });
+
+  @override
+  List<Object?> get props => [profileId, monthYear];
+}
+
+/// Evento para eliminar (soft delete) una transacción
+class DeleteTransaction extends FinanceEvent {
+  final String profileId;
+  final String transactionId;
+
+  const DeleteTransaction({
+    required this.profileId,
+    required this.transactionId,
+  });
+
+  @override
+  List<Object?> get props => [profileId, transactionId];
+}
+
+/// Evento para actualizar una transacción existente
+class UpdateTransaction extends FinanceEvent {
+  final String profileId;
+  final String transactionId;
+  final Map<String, dynamic> transactionData;
+
+  const UpdateTransaction({
+    required this.profileId,
+    required this.transactionId,
+    required this.transactionData,
+  });
+
+  @override
+  List<Object?> get props => [profileId, transactionId, transactionData];
 }

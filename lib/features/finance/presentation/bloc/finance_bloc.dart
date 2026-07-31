@@ -8,8 +8,13 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
 
   FinanceBloc(this.repository) : super(const FinanceInitial()) {
     on<LoadDashboard>(_onLoadDashboard);
+    on<LoadDashboardForMonth>(_onLoadDashboardForMonth);
     on<AddTransaction>(_onAddTransaction);
     on<RefreshDashboard>(_onRefreshDashboard);
+    on<SetMonthlyBudget>(_onSetMonthlyBudget);
+    on<FetchMonthlyBudget>(_onFetchMonthlyBudget);
+    on<DeleteTransaction>(_onDeleteTransaction);
+    on<UpdateTransaction>(_onUpdateTransaction);
   }
 
   /// Maneja el evento LoadDashboard
@@ -27,6 +32,27 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     emit(const FinanceLoading());
 
     final result = await repository.fetchDashboardData(event.profileId);
+
+    result.fold(
+      (failure) => emit(FinanceError(failure.message)),
+      (dashboard) => emit(DashboardLoaded(dashboard)),
+    );
+  }
+
+  /// Maneja el evento LoadDashboardForMonth
+  /// 
+  /// Carga los datos del dashboard para un mes específico.
+  /// Si no hay presupuesto en ese mes, busca el mes anterior con presupuesto.
+  Future<void> _onLoadDashboardForMonth(
+    LoadDashboardForMonth event,
+    Emitter<FinanceState> emit,
+  ) async {
+    emit(const FinanceLoading());
+
+    final result = await repository.fetchDashboardDataForMonth(
+      event.profileId,
+      event.month,
+    );
 
     result.fold(
       (failure) => emit(FinanceError(failure.message)),
@@ -88,6 +114,93 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     result.fold(
       (failure) => emit(FinanceError(failure.message)),
       (dashboard) => emit(DashboardLoaded(dashboard)),
+    );
+  }
+
+  /// Maneja el evento SetMonthlyBudget
+  /// 
+  /// Establece el límite de presupuesto mensual y recarga el dashboard.
+  /// Los ingresos se registran como transacciones, no aquí.
+  Future<void> _onSetMonthlyBudget(
+    SetMonthlyBudget event,
+    Emitter<FinanceState> emit,
+  ) async {
+    emit(const FinanceLoading());
+
+    final result = await repository.setMonthlyBudget(
+      event.profileId,
+      event.monthYear,
+      event.budgetLimit,
+    );
+
+    result.fold(
+      (failure) => emit(FinanceError(failure.message)),
+      (_) async {
+        emit(const BudgetSet());
+        // Refrescar el dashboard después de establecer el presupuesto
+        add(LoadDashboard(event.profileId));
+      },
+    );
+  }
+
+  /// Maneja el evento FetchMonthlyBudget
+  /// 
+  /// Obtiene el presupuesto mensual de un mes específico
+  Future<void> _onFetchMonthlyBudget(
+    FetchMonthlyBudget event,
+    Emitter<FinanceState> emit,
+  ) async {
+    emit(const FinanceLoading());
+
+    final result = await repository.getMonthlyBudget(
+      event.profileId,
+      event.monthYear,
+    );
+
+    result.fold(
+      (failure) => emit(FinanceError(failure.message)),
+      (budget) => emit(BudgetFetched(budget)),
+    );
+  }
+
+  /// Maneja el evento DeleteTransaction
+  /// 
+  /// Elimina (soft delete) una transacción y recarga el dashboard
+  Future<void> _onDeleteTransaction(
+    DeleteTransaction event,
+    Emitter<FinanceState> emit,
+  ) async {
+    final result = await repository.deleteTransaction(
+      event.transactionId,
+    );
+
+    result.fold(
+      (failure) => emit(FinanceError(failure.message)),
+      (_) async {
+        // Refrescar el dashboard después de eliminar la transacción
+        add(RefreshDashboard(event.profileId));
+      },
+    );
+  }
+
+  /// Maneja el evento UpdateTransaction
+  /// 
+  /// Actualiza una transacción existente y recarga el dashboard
+  Future<void> _onUpdateTransaction(
+    UpdateTransaction event,
+    Emitter<FinanceState> emit,
+  ) async {
+    final result = await repository.updateTransaction(
+      event.transactionId,
+      event.transactionData,
+    );
+
+    result.fold(
+      (failure) => emit(FinanceError(failure.message)),
+      (_) async {
+        // Refrescar el dashboard después de actualizar
+        add(RefreshDashboard(event.profileId));
+      },
     );
   }
 }
