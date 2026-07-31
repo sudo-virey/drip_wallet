@@ -43,12 +43,25 @@ abstract class FinanceRemoteDataSource {
 
 class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   final SupabaseClient supabaseClient;
+  
+  // Caché de categorías: Map<UUID, nombre>
+  Map<String, String> _categoryIdToName = {};
+  // Caché inverso: Map<nombre, UUID>
+  Map<String, String> _categoryNameToId = {};
+  // Caché de iconos: Map<UUID, nombre_icono>
+  Map<String, String> _categoryIdToIcon = {};
+  // Caché de tipo: Map<UUID, tipo>
+  Map<String, String> _categoryIdToType = {};
+  bool _categoriesLoaded = false;
 
   FinanceRemoteDataSourceImpl(this.supabaseClient);
 
   @override
   Future<DashboardModel> fetchDashboardData(String profileId) async {
     try {
+      // Cargar categorías desde BD si no están cacheadas
+      await _loadCategories();
+      
       final now = DateTime.now();
       final currentMonth = DateTime(now.year, now.month, 1);
 
@@ -106,6 +119,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
               date: e['created_at'] != null ? DateTime.parse(e['created_at'] as String) : DateTime.now(),
               type: e['type'] as String? ?? 'expense',
               description: e['description'] as String? ?? '',
+              icon: _getCategoryIcon(e['category_id'] as String?),
             ))
             .toList(),
       );
@@ -127,6 +141,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     DateTime month,
   ) async {
     try {
+      // Cargar categorías desde BD si no están cacheadas
+      await _loadCategories();
+      
       final startOfMonth = DateTime(month.year, month.month, 1);
       final endOfMonth = DateTime(month.year, month.month + 1, 1);
 
@@ -205,6 +222,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
               date: e['created_at'] != null ? DateTime.parse(e['created_at'] as String) : DateTime.now(),
               type: e['type'] as String? ?? 'expense',
               description: e['description'] as String? ?? '',
+              icon: _getCategoryIcon(e['category_id'] as String?),
             ))
             .toList(),
       );
@@ -223,6 +241,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<TransactionModel> addExpense(String profileId, Map<String, dynamic> data) async {
     try {
+      // Cargar categorías desde BD si no están cacheadas
+      await _loadCategories();
+      
       final now = DateTime.now();
       final currentMonth = DateTime(now.year, now.month, 1);
 
@@ -260,7 +281,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             'amount': data['amount'],
             'description': data['title'] ?? 'Unnamed',
             'type': data['type'] ?? 'expense',
-            'category_id': _getCategoryId(data['category'] ?? 'Other'),
+            'category_id': _getCategoryId(data['category'] ?? 'Otro'),
             'created_at': DateTime.now().toIso8601String(),
           })
           .select()
@@ -274,6 +295,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         date: DateTime.parse(response['created_at'] as String),
         type: response['type'] as String? ?? 'expense',
         description: response['description'] as String? ?? '',
+        icon: _getCategoryIcon(response['category_id'] as String?),
       );
 
       return transaction;
@@ -284,30 +306,93 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   /// Mapea categoría a su UUID correspondiente
   String _getCategoryId(String categoryName) {
-    final categoryMap = {
-      'Food': '550e8400-e29b-41d4-a716-446655440001',
-      'Transit': '550e8400-e29b-41d4-a716-446655440002',
-      'Bills': '550e8400-e29b-41d4-a716-446655440003',
-      'Shop': '550e8400-e29b-41d4-a716-446655440004',
-      'Home': '550e8400-e29b-41d4-a716-446655440005',
-      'Fun': '550e8400-e29b-41d4-a716-446655440006',
-      'Other': '550e8400-e29b-41d4-a716-446655440007',
-    };
-    return categoryMap[categoryName] ?? categoryMap['Other']!;
+    // Si no tenemos las categorías cacheadas, retornar valor por defecto
+    if (!_categoriesLoaded) {
+      return _categoryNameToId[categoryName] ?? '550e8400-e29b-41d4-a716-446655440007';
+    }
+    return _categoryNameToId[categoryName] ?? '550e8400-e29b-41d4-a716-446655440007';
   }
 
-  /// Mapea UUID de categoría a nombre en español
+  /// Mapea UUID de categoría a nombre desde el caché
   String _getCategoryName(String? categoryId) {
-    final categoryMap = {
-      '550e8400-e29b-41d4-a716-446655440001': 'Comida',
-      '550e8400-e29b-41d4-a716-446655440002': 'Transporte',
-      '550e8400-e29b-41d4-a716-446655440003': 'Facturas',
-      '550e8400-e29b-41d4-a716-446655440004': 'Compras',
-      '550e8400-e29b-41d4-a716-446655440005': 'Hogar',
-      '550e8400-e29b-41d4-a716-446655440006': 'Diversión',
-      '550e8400-e29b-41d4-a716-446655440007': 'Otro',
-    };
-    return categoryMap[categoryId] ?? 'Otro';
+    if (categoryId == null) return 'Otro';
+    // Si no tenemos las categorías cacheadas, retornar valor por defecto
+    if (!_categoriesLoaded) {
+      return _categoryIdToName[categoryId] ?? 'Otro';
+    }
+    return _categoryIdToName[categoryId] ?? 'Otro';
+  }
+
+  /// Carga las categorías desde la BD y las cachea
+  Future<void> _loadCategories() async {
+    if (_categoriesLoaded) return;
+    
+    try {
+      final response = await supabaseClient
+          .from('categories')
+          .select('id, name, icon, type');
+      
+      _categoryIdToName.clear();
+      _categoryNameToId.clear();
+      _categoryIdToIcon.clear();
+      _categoryIdToType.clear();
+      
+      print('\n=== DEBUG: CARGANDO CATEGORÍAS DE LA BD ===');
+      for (var category in response as List) {
+        final id = category['id'] as String;
+        final name = category['name'] as String;
+        final icon = category['icon'] as String?;
+        final type = category['type'] as String?;
+        _categoryIdToName[id] = name;
+        _categoryNameToId[name] = id;
+        if (icon != null) {
+          _categoryIdToIcon[id] = icon;
+          print('✓ Categoría: "$name" | Icono en BD: "$icon" | Tipo: "$type"');
+        } else {
+          print('✗ Categoría: "$name" | ICONO NULL | Tipo: "$type"');
+        }
+        if (type != null) {
+          _categoryIdToType[id] = type;
+        }
+      }
+      print('Total categorías: ${_categoryIdToName.length}\n');
+      
+      _categoriesLoaded = true;
+    } catch (e) {
+      print('Error cargando categorías: $e');
+      _categoriesLoaded = false;
+    }
+  }
+
+  /// Obtiene el nombre del icono para una categoría
+  String? _getCategoryIcon(String? categoryId) {
+    if (categoryId == null) {
+      print('DEBUG _getCategoryIcon: categoryId es NULL → devolviendo null');
+      return null;
+    }
+    final icon = _categoryIdToIcon[categoryId];
+    print('DEBUG _getCategoryIcon: categoryId="$categoryId" → icono="$icon"');
+    return icon;
+  }
+
+  /// Obtiene todas las categorías dinámicamente desde la BD
+  /// Filtra por tipo si se especifica (expense, income, o null para todas)
+  Future<List<Map<String, dynamic>>> getCategories({String? type}) async {
+    await _loadCategories();
+    
+    try {
+      var query = supabaseClient.from('categories').select('id, name, icon, type');
+      
+      if (type != null) {
+        query = query.eq('type', type);
+      }
+      
+      final response = await query.order('name');
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('Error obteniendo categorías: $e');
+      return [];
+    }
   }
 
   @override
@@ -406,11 +491,14 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     Map<String, dynamic> data,
   ) async {
     try {
+      // Cargar categorías desde BD si no están cacheadas
+      await _loadCategories();
+      
       final updateData = {
         'description': data['title'] ?? data['description'],
         'amount': data['amount'],
         'type': data['type'],
-        'category_id': _getCategoryId(data['category'] ?? 'Other'),
+        'category_id': _getCategoryId(data['category'] ?? 'Otro'),
         'created_at': data['date'] ?? DateTime.now().toIso8601String(),
       };
 

@@ -28,6 +28,7 @@ class TransactionEntity extends Equatable {
   final DateTime date;
   final String type; // 'income' o 'expense'
   final String? description;
+  final String? icon; // Nombre del icono de la categoría
 
   const TransactionEntity({
     required this.id,
@@ -37,9 +38,10 @@ class TransactionEntity extends Equatable {
     required this.date,
     required this.type,
     this.description,
+    this.icon,
   });
 
   @override
   List<Object?> get props =>
-      [id, title, category, amount, date, type, description];
+      [id, title, category, amount, date, type, description, icon];
 }

@@ -3,8 +3,10 @@ import 'package:drip_wallet/core/theme/drip_theme_helper.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
+import 'package:drip_wallet/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -17,24 +19,60 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedCategory = 'Todas las Categorías';
   String _selectedDateFilter = 'Este Mes';
 
-  final List<String> _categories = [
-    'Todas las Categorías',
-    'Comida',
-    'Transporte',
-    'Facturas',
-    'Compras',
-    'Casa',
-    'Diversión',
-    'Otro',
-  ];
+  // Cargar categorías dinámicamente desde la BD
+  List<String> _categories = ['Todas las Categorías'];
 
   @override
   void initState() {
     super.initState();
+    _loadCategories();
+    
     // Cargar dashboard con transacciones
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       context.read<FinanceBloc>().add(LoadDashboard(authState.user.id));
+    }
+  }
+
+  /// Cargar categorías dinámicamente desde la BD
+  Future<void> _loadCategories() async {
+    try {
+      final supabaseClient = getIt<SupabaseClient>();
+      print('DEBUG history: Iniciando carga de categorías...');
+      
+      // Primero: Ver TODOS los registros sin filtro
+      final allResponse = await supabaseClient
+          .from('categories')
+          .select('*');
+      print('DEBUG: Total categorías sin filtro: ${(allResponse as List).length}');
+      print('DEBUG: Datos completos: $allResponse');
+      
+      final response = await supabaseClient
+          .from('categories')
+          .select('id, name, type')
+          .order('name');
+      
+      print('DEBUG: Categorías cargadas: ${(response as List).length} items');
+      print('DEBUG: Datos: $response');
+      
+      if (mounted) {
+        final categoryNames = (response as List)
+            .map((e) => e['name'] as String)
+            .toSet()
+            .toList();
+        
+        categoryNames.sort();
+        
+        print('DEBUG: Nombres únicos: $categoryNames');
+        
+        setState(() {
+          _categories = ['Todas las Categorías', ...categoryNames];
+          print('DEBUG: Categorías finales: $_categories');
+        });
+      }
+    } catch (e, stackTrace) {
+      print('ERROR CRÍTICO cargando categorías: $e');
+      print('Stack trace: $stackTrace');
     }
   }
 

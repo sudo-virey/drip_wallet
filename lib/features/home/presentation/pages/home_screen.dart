@@ -532,17 +532,6 @@ class _HomeScreenState extends State<HomeScreen> {
         (index) {
           final transaction = dashboard.recentTransactions[index];
 
-          // Mapear categoría a icono
-          final iconMap = {
-            'Food': Icons.restaurant,
-            'Transit': Icons.directions_car,
-            'Bills': Icons.receipt,
-            'Shop': Icons.shopping_bag,
-            'Home': Icons.home,
-            'Fun': Icons.sentiment_satisfied,
-            'Other': Icons.more_horiz,
-          };
-
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: GestureDetector(
@@ -563,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        iconMap[transaction.category] ?? Icons.shopping_cart,
+                        _getIconFromName(transaction.icon),
                         color: const Color(0xFF001F3F),
                         size: 24,
                       ),
@@ -608,5 +597,56 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
+  }
+
+  /// Convierte el nombre del icono desde la BD a IconData
+  IconData _getIconFromName(String? iconName) {
+    print('DEBUG _getIconFromName: Recibido iconName="$iconName"');
+    switch (iconName) {
+      // Iconos de Gastos
+      case 'restaurant':
+        print('  → Devolviendo: Icons.restaurant');
+        return Icons.restaurant;
+      case 'directions_car':
+        print('  → Devolviendo: Icons.directions_car');
+        return Icons.directions_car;
+      case 'receipt':
+        print('  → Devolviendo: Icons.receipt');
+        return Icons.receipt;
+      case 'shopping_bag':
+        print('  → Devolviendo: Icons.shopping_bag');
+        return Icons.shopping_bag;
+      case 'home':
+        print('  → Devolviendo: Icons.home');
+        return Icons.home;
+      case 'sentiment_satisfied':
+        print('  → Devolviendo: Icons.sentiment_satisfied');
+        return Icons.sentiment_satisfied;
+      // Iconos de Ingresos
+      case 'attach_money':
+        print('  → Devolviendo: Icons.attach_money');
+        return Icons.attach_money;
+      case 'work':
+        print('  → Devolviendo: Icons.work');
+        return Icons.work;
+      case 'trending_up':
+        print('  → Devolviendo: Icons.trending_up');
+        return Icons.trending_up;
+      case 'card_giftcard':
+        print('  → Devolviendo: Icons.card_giftcard');
+        return Icons.card_giftcard;
+      case 'favorite':
+        print('  → Devolviendo: Icons.favorite');
+        return Icons.favorite;
+      case 'volunteer_activism':
+        print('  → Devolviendo: Icons.volunteer_activism');
+        return Icons.volunteer_activism;
+      case 'more_horiz':
+        print('  → Devolviendo: Icons.more_horiz');
+        return Icons.more_horiz;
+      default:
+        print('  → NO COINCIDIÓ - Devolviendo default: Icons.shopping_cart');
+        return Icons.shopping_cart;
+    }
   }
 }

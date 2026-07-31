@@ -4,6 +4,8 @@ import 'package:drip_ui/drip_ui.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
+import 'package:drip_wallet/injection_container.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NewExpenseModal extends StatefulWidget {
   const NewExpenseModal({super.key});
@@ -17,18 +19,13 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
   double _amount = 0.0;
-  String _selectedCategory = 'Food';
+  String _selectedCategory = '';
   DateTime _selectedDate = DateTime.now();
+  String _selectedType = 'expense';
 
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'Food', 'icon': Icons.restaurant},
-    {'name': 'Transit', 'icon': Icons.directions_car},
-    {'name': 'Bills', 'icon': Icons.receipt},
-    {'name': 'Shop', 'icon': Icons.shopping_bag},
-    {'name': 'Home', 'icon': Icons.home},
-    {'name': 'Fun', 'icon': Icons.sentiment_satisfied},
-    {'name': 'Other', 'icon': Icons.more_horiz},
-  ];
+  // Categorías cargadas dinámicamente desde la BD
+  List<Map<String, dynamic>> _expenseCategories = [];
+  List<Map<String, dynamic>> _incomeCategories = [];
 
   @override
   void initState() {
@@ -37,6 +34,102 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
     _amountController = TextEditingController();
     _descriptionController = TextEditingController();
     _amountController.addListener(_updateAmount);
+    _loadCategories();
+  }
+
+  /// Cargar categorías dinámicamente desde la BD
+  Future<void> _loadCategories() async {
+    try {
+      final supabaseClient = getIt<SupabaseClient>();
+      print('DEBUG new_expense_modal: Iniciando carga de categorías...');
+      
+      // Primero: Ver TODOS los registros sin filtro
+      final allCategories = await supabaseClient
+          .from('categories')
+          .select('*');
+      print('DEBUG: Total categorías sin filtro: ${(allCategories as List).length}');
+      print('DEBUG: Datos completos: $allCategories');
+      
+      // Cargar gastos
+      final expenseResponse = await supabaseClient
+          .from('categories')
+          .select('id, name, icon, type')
+          .eq('type', 'expense')
+          .order('name');
+      print('DEBUG: Gastos cargados: ${(expenseResponse as List).length} items');
+      print('DEBUG: Datos gastos: $expenseResponse');
+      
+      // Cargar ingresos
+      final incomeResponse = await supabaseClient
+          .from('categories')
+          .select('id, name, icon, type')
+          .eq('type', 'income')
+          .order('name');
+      print('DEBUG: Ingresos cargados: ${(incomeResponse as List).length} items');
+      print('DEBUG: Datos ingresos: $incomeResponse');
+      
+      if (mounted) {
+        setState(() {
+          _expenseCategories = (expenseResponse as List)
+              .map((e) => {
+                'name': e['name'] as String,
+                'icon': _iconFromString(e['icon'] as String),
+              })
+              .toList();
+          
+          _incomeCategories = (incomeResponse as List)
+              .map((e) => {
+                'name': e['name'] as String,
+                'icon': _iconFromString(e['icon'] as String),
+              })
+              .toList();
+          
+          print('DEBUG: Categorías procesadas - Expense: ${_expenseCategories.length}, Income: ${_incomeCategories.length}');
+          
+          // Establecer primera categoría por defecto
+          if (_expenseCategories.isNotEmpty) {
+            _selectedCategory = _expenseCategories[0]['name'] as String;
+          }
+        });
+      }
+    } catch (e, stackTrace) {
+      print('ERROR CRÍTICO cargando categorías: $e');
+      print('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Convertir nombre de icono a IconData
+  IconData _iconFromString(String iconName) {
+    switch (iconName) {
+      case 'restaurant':
+        return Icons.restaurant;
+      case 'directions_car':
+        return Icons.directions_car;
+      case 'receipt':
+        return Icons.receipt;
+      case 'shopping_bag':
+        return Icons.shopping_bag;
+      case 'home':
+        return Icons.home;
+      case 'sentiment_satisfied':
+        return Icons.sentiment_satisfied;
+      case 'attach_money':
+        return Icons.attach_money;
+      case 'work':
+        return Icons.work;
+      case 'trending_up':
+        return Icons.trending_up;
+      case 'card_giftcard':
+        return Icons.card_giftcard;
+      case 'favorite':
+        return Icons.favorite;
+      case 'volunteer_activism':
+        return Icons.volunteer_activism;
+      case 'more_horiz':
+        return Icons.more_horiz;
+      default:
+        return Icons.shopping_cart;
+    }
   }
 
   @override
@@ -57,6 +150,8 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isIncome = _selectedType == 'income';
+    final titleText = isIncome ? 'Nuevo Ingreso' : 'Nuevo Gasto';
 
     return Container(
       decoration: const BoxDecoration(
@@ -78,7 +173,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                 children: [
                   const SizedBox(width: 40),
                   Text(
-                    'New Expense',
+                    titleText,
                     style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.primaryColor,
@@ -101,8 +196,98 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Transaction Type Selection
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedType = 'expense';
+                              if (_expenseCategories.isNotEmpty) {
+                                _selectedCategory = _expenseCategories[0]['name'] as String;
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _selectedType == 'expense'
+                                  ? Colors.red.shade500
+                                  : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.trending_down,
+                                  color: _selectedType == 'expense'
+                                      ? Colors.white
+                                      : Colors.black,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Gasto',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedType == 'expense'
+                                        ? Colors.white
+                                        : Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedType = 'income';
+                              if (_incomeCategories.isNotEmpty) {
+                                _selectedCategory = _incomeCategories[0]['name'] as String;
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _selectedType == 'income'
+                                  ? Colors.green.shade500
+                                  : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.trending_up,
+                                  color: _selectedType == 'income'
+                                      ? Colors.white
+                                      : Colors.black,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Ingreso',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedType == 'income'
+                                        ? Colors.white
+                                        : Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                   // Amount Input
-                  const SizedBox(height: 20),
                   Center(
                     child: Column(
                       children: [
@@ -124,7 +309,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                                   ),
                             ),
                             SizedBox(
-                              width: 150,
+                              width: 200,
                               child: TextField(
                                 controller: _amountController,
                                 textAlign: TextAlign.center,
@@ -145,32 +330,6 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                                   decimal: true,
                                 ),
                               ),
-                            ),
-                            Column(
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() => _amount += 1);
-                                  },
-                                  child: Icon(
-                                    Icons.arrow_drop_up,
-                                    size: 24,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      if (_amount > 0) _amount -= 1;
-                                    });
-                                  },
-                                  child: Icon(
-                                    Icons.arrow_drop_down,
-                                    size: 24,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),
@@ -195,9 +354,14 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
                     ),
-                    itemCount: _categories.length,
+                    itemCount: _selectedType == 'income'
+                        ? _incomeCategories.length
+                        : _expenseCategories.length,
                     itemBuilder: (context, index) {
-                      final category = _categories[index];
+                      final categories = _selectedType == 'income'
+                          ? _incomeCategories
+                          : _expenseCategories;
+                      final category = categories[index];
                       final isSelected = _selectedCategory == category['name'];
                       return GestureDetector(
                         onTap: () {
@@ -312,7 +476,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                     height: 56,
                     child: DripButton(
                       onPressed: _saveExpense,
-                      label: 'Save Expense',
+                      label: _selectedType == 'income' ? 'Guardar Ingreso' : 'Guardar Gasto',
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -325,7 +489,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
     );
   }
 
-  /// Guardar el gasto y disparar evento del FinanceBloc
+  /// Guardar la transacción y disparar evento del FinanceBloc
   void _saveExpense() {
     // Validar monto
     if (_amount <= 0) {
@@ -355,7 +519,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
       'title': _selectedCategory,
       'category': _selectedCategory,
       'amount': _amount,
-      'type': 'expense',
+      'type': _selectedType,
       'date': _selectedDate,
       'description': _descriptionController.text,
     };

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:drip_wallet/injection_container.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditTransactionModal extends StatefulWidget {
   final TransactionEntity transaction;
@@ -23,27 +24,124 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
   late DateTime _selectedDate;
   late String _selectedType;
 
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'Food', 'icon': Icons.restaurant},
-    {'name': 'Transit', 'icon': Icons.directions_car},
-    {'name': 'Bills', 'icon': Icons.receipt},
-    {'name': 'Shop', 'icon': Icons.shopping_bag},
-    {'name': 'Home', 'icon': Icons.home},
-    {'name': 'Fun', 'icon': Icons.sentiment_satisfied},
-    {'name': 'Other', 'icon': Icons.more_horiz},
-  ];
+  // Categorías cargadas dinámicamente desde la BD
+  List<Map<String, dynamic>> _expenseCategories = [];
+  List<Map<String, dynamic>> _incomeCategories = [];
 
   @override
   void initState() {
     super.initState();
     _amount = widget.transaction.amount;
-    _selectedCategory = widget.transaction.category;
     _selectedDate = widget.transaction.date;
     _selectedType = widget.transaction.type;
+    _selectedCategory = widget.transaction.category;
 
     _amountController = TextEditingController(text: _amount.toString());
     _descriptionController = TextEditingController(text: widget.transaction.title);
     _amountController.addListener(_updateAmount);
+    
+    _loadCategories();
+  }
+
+  /// Cargar categorías dinámicamente desde la BD
+  Future<void> _loadCategories() async {
+    try {
+      final supabaseClient = getIt<SupabaseClient>();
+      print('DEBUG: Iniciando carga de categorías (edit modal)...');
+      
+      // Primero: Ver TODOS los registros sin filtro
+      final allCategories = await supabaseClient
+          .from('categories')
+          .select('*');
+      print('DEBUG: Total de categorías sin filtro: ${(allCategories as List).length}');
+      print('DEBUG: Datos completos: $allCategories');
+      
+      // Cargar gastos
+      final expenseResponse = await supabaseClient
+          .from('categories')
+          .select('id, name, icon, type')
+          .eq('type', 'expense')
+          .order('name');
+      print('DEBUG: Gastos cargados: ${(expenseResponse as List).length} items');
+      print('DEBUG: Datos de gastos: $expenseResponse');
+      
+      // Cargar ingresos
+      final incomeResponse = await supabaseClient
+          .from('categories')
+          .select('id, name, icon, type')
+          .eq('type', 'income')
+          .order('name');
+      print('DEBUG: Ingresos cargados: ${(incomeResponse as List).length} items');
+      print('DEBUG: Datos de ingresos: $incomeResponse');
+      
+      if (mounted) {
+        setState(() {
+          _expenseCategories = (expenseResponse as List)
+              .map((e) => {
+                'name': e['name'] as String,
+                'icon': _iconFromString(e['icon'] as String),
+              })
+              .toList();
+          
+          _incomeCategories = (incomeResponse as List)
+              .map((e) => {
+                'name': e['name'] as String,
+                'icon': _iconFromString(e['icon'] as String),
+              })
+              .toList();
+          
+          print('DEBUG: Categorías procesadas - Expense: ${_expenseCategories.length}, Income: ${_incomeCategories.length}');
+          
+          // Validar que la categoría cargada exista en la lista, si no, usar la primera
+          final validCategories = _selectedType == 'income' ? _incomeCategories : _expenseCategories;
+          final validCategoryNames = validCategories.map((c) => c['name'] as String).toList();
+          
+          print('DEBUG: Validando categoría "${_selectedCategory}" en lista: $validCategoryNames');
+          
+          if (!validCategoryNames.contains(_selectedCategory) && validCategories.isNotEmpty) {
+            print('DEBUG: Categoría no encontrada, usando primera: ${validCategories[0]['name']}');
+            _selectedCategory = validCategories[0]['name'] as String;
+          }
+        });
+      }
+    } catch (e, stackTrace) {
+      print('ERROR CRÍTICO cargando categorías: $e');
+      print('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Convertir nombre de icono a IconData
+  IconData _iconFromString(String iconName) {
+    switch (iconName) {
+      case 'restaurant':
+        return Icons.restaurant;
+      case 'directions_car':
+        return Icons.directions_car;
+      case 'receipt':
+        return Icons.receipt;
+      case 'shopping_bag':
+        return Icons.shopping_bag;
+      case 'home':
+        return Icons.home;
+      case 'sentiment_satisfied':
+        return Icons.sentiment_satisfied;
+      case 'attach_money':
+        return Icons.attach_money;
+      case 'work':
+        return Icons.work;
+      case 'trending_up':
+        return Icons.trending_up;
+      case 'card_giftcard':
+        return Icons.card_giftcard;
+      case 'favorite':
+        return Icons.favorite;
+      case 'volunteer_activism':
+        return Icons.volunteer_activism;
+      case 'more_horiz':
+        return Icons.more_horiz;
+      default:
+        return Icons.shopping_cart;
+    }
   }
 
   @override
@@ -79,7 +177,7 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
       return;
     }
 
-    final user = supabase.Supabase.instance.client.auth.currentUser;
+    final user = getIt<SupabaseClient>().auth.currentUser;
     if (user == null) return;
 
     final updatedData = {
@@ -153,7 +251,14 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
                         ? Colors.red 
                         : Colors.grey.shade300,
                     ),
-                    onPressed: () => setState(() => _selectedType = 'expense'),
+                    onPressed: () {
+                      setState(() {
+                        _selectedType = 'expense';
+                        if (_expenseCategories.isNotEmpty) {
+                          _selectedCategory = _expenseCategories[0]['name'] as String;
+                        }
+                      });
+                    },
                     child: Text(
                       'Gasto',
                       style: TextStyle(
@@ -172,7 +277,14 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
                         ? Colors.green 
                         : Colors.grey.shade300,
                     ),
-                    onPressed: () => setState(() => _selectedType = 'income'),
+                    onPressed: () {
+                      setState(() {
+                        _selectedType = 'income';
+                        if (_incomeCategories.isNotEmpty) {
+                          _selectedCategory = _incomeCategories[0]['name'] as String;
+                        }
+                      });
+                    },
                     child: Text(
                       'Ingreso',
                       style: TextStyle(
@@ -191,9 +303,14 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
               height: 60,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: _categories.length,
+                itemCount: _selectedType == 'income'
+                    ? _incomeCategories.length
+                    : _expenseCategories.length,
                 itemBuilder: (context, index) {
-                  final category = _categories[index];
+                  final categories = _selectedType == 'income'
+                      ? _incomeCategories
+                      : _expenseCategories;
+                  final category = categories[index];
                   final isSelected = _selectedCategory == category['name'];
                   return GestureDetector(
                     onTap: () => setState(() => _selectedCategory = category['name']),

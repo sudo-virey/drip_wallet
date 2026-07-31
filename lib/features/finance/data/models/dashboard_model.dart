@@ -52,6 +52,7 @@ class TransactionModel extends TransactionEntity {
     required DateTime date,
     required String type,
     String? description,
+    String? icon,
   }) : super(
     id: id,
     title: title,
@@ -60,6 +61,7 @@ class TransactionModel extends TransactionEntity {
     date: date,
     type: type,
     description: description,
+    icon: icon,
   );
 
   /// Convierte un JSON de Supabase a TransactionModel
@@ -72,6 +74,7 @@ class TransactionModel extends TransactionEntity {
       date: DateTime.parse(json['date'] as String),
       type: json['type'] as String,
       description: json['description'] as String?,
+      icon: json['icon'] as String?,
     );
   }
 
