@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:drip_ui/drip_ui.dart';
+import 'package:drip_wallet/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
+import 'package:drip_wallet/features/finance/finance_exports.dart';
 
 class NewExpenseModal extends StatefulWidget {
   const NewExpenseModal({super.key});
@@ -293,15 +297,7 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
                     width: double.infinity,
                     height: 56,
                     child: DripButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Expense saved successfully!'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
+                      onPressed: _saveExpense,
                       label: 'Save Expense',
                     ),
                   ),
@@ -313,5 +309,52 @@ class _NewExpenseModalState extends State<NewExpenseModal> {
         ),
       ),
     );
+  }
+
+  /// Guardar el gasto y disparar evento del FinanceBloc
+  void _saveExpense() {
+    // Validar monto
+    if (_amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid amount'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Obtener userId del AuthBloc
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User not authenticated'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Preparar datos de la transacción
+    final transactionData = {
+      'title': _selectedCategory,
+      'category': _selectedCategory,
+      'amount': _amount,
+      'type': 'expense',
+      'date': _selectedDate,
+      'description': '', // TODO: Obtener descripción del campo
+    };
+
+    // Disparar evento AddTransaction
+    context.read<FinanceBloc>().add(
+      AddTransaction(
+        profileId: authState.user.id,
+        transactionData: transactionData,
+      ),
+    );
+
+    // Cerrar modal
+    Navigator.pop(context);
   }
 }

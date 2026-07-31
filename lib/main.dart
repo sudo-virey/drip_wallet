@@ -1,6 +1,7 @@
 import 'package:drip_wallet/core/theme/app_theme.dart';
 import 'package:drip_wallet/features/auth/data/repositories/auth_repository.dart';
 import 'package:drip_wallet/features/auth/presentation/bloc/auth_state.dart';
+import 'package:drip_wallet/features/finance/finance_exports.dart';
 import 'package:drip_wallet/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -21,18 +22,22 @@ class DripWalletApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) =>
-          AuthBloc(getIt<AuthRepository>())..add(AuthCheckRequested()),
-      // 1. Especifica los tipos <AuthBloc, AuthState>
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) =>
+              AuthBloc(getIt<AuthRepository>())..add(AuthCheckRequested()),
+        ),
+        BlocProvider(
+          create: (context) => getIt<FinanceBloc>(),
+        ),
+      ],
       child: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           print("ESTADO DEL BLOC: $state");
         },
         child: Builder(
           builder: (newContext) {
-            // 2. Usa este 'newContext'
-            // 3. Usa 'newContext' para leer el Bloc, NO 'context'
             final authBloc = newContext.read<AuthBloc>();
 
             return MaterialApp.router(
