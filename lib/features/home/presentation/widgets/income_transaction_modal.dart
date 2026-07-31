@@ -67,39 +67,6 @@ class _IncomeTransactionModalState extends State<IncomeTransactionModal> {
     }
   }
 
-  IconData _iconFromString(String iconName) {
-    switch (iconName) {
-      case 'restaurant':
-        return Icons.restaurant;
-      case 'directions_car':
-        return Icons.directions_car;
-      case 'receipt':
-        return Icons.receipt;
-      case 'shopping_bag':
-        return Icons.shopping_bag;
-      case 'home':
-        return Icons.home;
-      case 'sentiment_satisfied':
-        return Icons.sentiment_satisfied;
-      case 'attach_money':
-        return Icons.attach_money;
-      case 'work':
-        return Icons.work;
-      case 'trending_up':
-        return Icons.trending_up;
-      case 'card_giftcard':
-        return Icons.card_giftcard;
-      case 'favorite':
-        return Icons.favorite;
-      case 'volunteer_activism':
-        return Icons.volunteer_activism;
-      case 'more_horiz':
-        return Icons.more_horiz;
-      default:
-        return Icons.shopping_cart;
-    }
-  }
-
   @override
   void dispose() {
     _formController.dispose();
