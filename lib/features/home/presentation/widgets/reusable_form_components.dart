@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:drip_ui/drip_ui.dart';
 import 'package:drip_wallet/core/utils/icon_converter.dart';
 
 /// Botón selector de tipo de transacción (Gasto/Ingreso)
