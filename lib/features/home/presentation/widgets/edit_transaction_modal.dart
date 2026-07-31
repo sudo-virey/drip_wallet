@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:drip_ui/drip_ui.dart';
+import 'package:drip_wallet/core/utils/icon_converter.dart';
 import 'package:drip_wallet/features/finance/finance_exports.dart';
 import 'package:drip_wallet/features/home/presentation/widgets/reusable_form_components.dart';
 import 'package:drip_wallet/injection_container.dart';
@@ -68,14 +69,14 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
           _expenseCategories = (expenseResponse as List)
               .map((e) => {
                 'name': e['name'] as String,
-                'icon': _iconFromString(e['icon'] as String),
+                'icon': stringToIconData(e['icon'] as String),
               })
               .toList();
           
           _incomeCategories = (incomeResponse as List)
               .map((e) => {
                 'name': e['name'] as String,
-                'icon': _iconFromString(e['icon'] as String),
+                'icon': stringToIconData(e['icon'] as String),
               })
               .toList();
           
@@ -89,40 +90,6 @@ class _EditTransactionModalState extends State<EditTransactionModal> {
       }
     } catch (e) {
       print('ERROR cargando categorías: $e');
-    }
-  }
-
-  /// Convertir nombre de icono a IconData
-  IconData _iconFromString(String iconName) {
-    switch (iconName) {
-      case 'restaurant':
-        return Icons.restaurant;
-      case 'directions_car':
-        return Icons.directions_car;
-      case 'receipt':
-        return Icons.receipt;
-      case 'shopping_bag':
-        return Icons.shopping_bag;
-      case 'home':
-        return Icons.home;
-      case 'sentiment_satisfied':
-        return Icons.sentiment_satisfied;
-      case 'attach_money':
-        return Icons.attach_money;
-      case 'work':
-        return Icons.work;
-      case 'trending_up':
-        return Icons.trending_up;
-      case 'card_giftcard':
-        return Icons.card_giftcard;
-      case 'favorite':
-        return Icons.favorite;
-      case 'volunteer_activism':
-        return Icons.volunteer_activism;
-      case 'more_horiz':
-        return Icons.more_horiz;
-      default:
-        return Icons.shopping_cart;
     }
   }
 

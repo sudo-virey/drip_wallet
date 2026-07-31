@@ -3,6 +3,11 @@ import 'package:drip_wallet/features/finance/domain/repositories/finance_reposit
 import 'finance_event.dart';
 import 'finance_state.dart';
 
+enum FinanceViewTarget {
+  home,
+  history,
+}
+
 class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   final FinanceRepository repository;
 
@@ -16,6 +21,29 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     on<FetchMonthlyBudget>(_onFetchMonthlyBudget);
     on<DeleteTransaction>(_onDeleteTransaction);
     on<UpdateTransaction>(_onUpdateTransaction);
+  }
+
+  /// Refresca la vista activa sin duplicar la lógica de eventos en UI.
+  void refreshView({
+    required FinanceViewTarget target,
+    required String profileId,
+    DateTime? month,
+  }) {
+    switch (target) {
+      case FinanceViewTarget.home:
+        if (month == null) {
+          add(LoadDashboard(profileId));
+        } else {
+          add(LoadDashboardForMonth(profileId: profileId, month: month));
+        }
+        break;
+      case FinanceViewTarget.history:
+        add(LoadHistoryForMonth(
+          profileId: profileId,
+          month: month ?? DateTime.now(),
+        ));
+        break;
+    }
   }
 
   /// Maneja el evento LoadDashboard

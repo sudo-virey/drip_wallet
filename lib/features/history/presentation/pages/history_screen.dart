@@ -21,6 +21,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedCategory = 'Todas las Categorías';
   String _selectedDateFilter = 'Este Mes';
   late final ReportService _reportService;
+  late final DateTime _selectedMonth;
 
   // Cargar categorías dinámicamente desde la BD
   List<Map<String, dynamic>> _categories = [];
@@ -37,21 +38,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     _reportService = ReportService();
+    _selectedMonth = DateTime.now();
     _loadCategories();
     
     // Cargar transacciones del mes actual para History
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authState = context.read<AuthBloc>().state;
       if (authState is Authenticated) {
-        final now = DateTime.now();
         context.read<FinanceBloc>().add(
           LoadHistoryForMonth(
             profileId: authState.user.id,
-            month: now,
+            month: _selectedMonth,
           ),
         );
       }
     });
+  }
+
+  Future<void> _refreshHistory() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      context.read<FinanceBloc>().refreshView(
+            target: FinanceViewTarget.history,
+            profileId: authState.user.id,
+            month: _selectedMonth,
+          );
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 300));
   }
 
   /// Cargar categorías dinámicamente desde la BD
@@ -114,8 +128,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
               return dateB.compareTo(dateA);
             });
 
-            return CustomScrollView(
-              slivers: [
+            return RefreshIndicator(
+              onRefresh: _refreshHistory,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
@@ -258,7 +275,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
             );
           }
 

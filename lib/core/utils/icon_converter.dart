@@ -41,6 +41,28 @@ IconData stringToIconData(String iconName) {
       return Icons.fitness_center;
     case 'videogame_asset':
       return Icons.videogame_asset;
+    case 'notifications_none':
+      return Icons.notifications_none;
+    case 'settings_outlined':
+      return Icons.settings_outlined;
+    case 'edit':
+      return Icons.edit;
+    case 'delete':
+      return Icons.delete;
+    case 'inbox':
+      return Icons.inbox;
+    case 'calendar_today':
+      return Icons.calendar_today;
+    case 'chevron_left':
+      return Icons.chevron_left;
+    case 'chevron_right':
+      return Icons.chevron_right;
+    case 'error':
+      return Icons.error;
+    case 'account_circle':
+      return Icons.account_circle;
+    case 'home_filled':
+      return Icons.home;
     default:
       return Icons.category;
   }
